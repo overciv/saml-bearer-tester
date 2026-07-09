@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SAML Bearer Token Tester</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --surface2: #21262d;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-muted: #8b949e;
+      --blue: #58a6ff;
+      --green: #3fb950;
+      --red: #f85149;
+      --yellow: #d29922;
+      --purple: #bc8cff;
+      --orange: #ffa657;
+    }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace; }
+    .navbar-brand { font-weight: 700; font-size: 1.1rem; letter-spacing: -0.3px; }
+    .badge-version { background: var(--surface2); color: var(--text-muted); font-size: 0.65rem; padding: 2px 6px; border-radius: 4px; vertical-align: middle; }
+
+    .sidebar { position: sticky; top: 70px; height: calc(100vh - 90px); overflow-y: auto; }
+    .step-link { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; color: var(--text-muted); text-decoration: none; font-size: 0.875rem; transition: all 0.15s; margin-bottom: 2px; }
+    .step-link:hover { background: var(--surface2); color: var(--text); }
+    .step-link.active { background: rgba(88,166,255,0.12); color: var(--blue); }
+    .step-num { width: 22px; height: 22px; border-radius: 50%; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 700; flex-shrink: 0; }
+    .step-link.active .step-num { background: var(--blue); color: #0d1117; }
+    .step-link.done .step-num { background: var(--green); color: #0d1117; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+    .card-header { background: var(--surface2); border-bottom: 1px solid var(--border); border-radius: 10px 10px 0 0 !important; padding: 14px 20px; }
+    .section-title { font-weight: 600; font-size: 0.95rem; display: flex; align-items: center; gap: 8px; }
+    .section-title .bi { color: var(--blue); }
+
+    .form-control, .form-select { background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 0.875rem; }
+    .form-control:focus, .form-select:focus { background: var(--surface2); border-color: var(--blue); color: var(--text); box-shadow: 0 0 0 3px rgba(88,166,255,0.15); }
+    .form-control::placeholder { color: var(--text-muted); }
+    .form-label { font-size: 0.8rem; color: var(--text-muted); font-weight: 500; margin-bottom: 4px; }
+    .input-hint { font-size: 0.72rem; color: var(--text-muted); margin-top: 3px; }
+
+    .btn-primary { background: var(--blue); border-color: var(--blue); color: #0d1117; font-weight: 600; }
+    .btn-primary:hover { background: #79b8ff; border-color: #79b8ff; color: #0d1117; }
+    .btn-outline-secondary { border-color: var(--border); color: var(--text-muted); font-size: 0.8rem; }
+    .btn-outline-secondary:hover { background: var(--surface2); color: var(--text); }
+    .btn-sm { padding: 4px 10px; font-size: 0.775rem; }
+
+    .code-block { background: #0d1117; border: 1px solid var(--border); border-radius: 8px; padding: 14px; font-family: 'SF Mono', 'Fira Code', 'Monaco', monospace; font-size: 0.78rem; line-height: 1.6; overflow: auto; max-height: 400px; position: relative; white-space: pre-wrap; word-break: break-all; }
+    .code-block.xml { color: #79b8ff; }
+    .code-block.json { color: #b5cea8; }
+    .code-block.base64 { color: var(--orange); word-break: break-all; white-space: pre-wrap; }
+
+    .copy-btn { position: absolute; top: 8px; right: 8px; z-index: 10; }
+
+    .token-field { position: relative; }
+    .token-value { background: #0d1117; border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-family: monospace; font-size: 0.75rem; color: var(--orange); word-break: break-all; max-height: 80px; overflow: auto; }
+
+    .jwt-decoded { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .jwt-part { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+    .jwt-part:last-child { border-bottom: none; }
+    .jwt-part-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; }
+    .jwt-header-label { color: var(--red); }
+    .jwt-payload-label { color: var(--purple); }
+    .jwt-sig-label { color: var(--blue); }
+    .jwt-content { font-family: monospace; font-size: 0.775rem; color: #b5cea8; white-space: pre-wrap; }
+
+    .attr-row { display: flex; gap: 8px; margin-bottom: 6px; align-items: center; }
+    .attr-row input { flex: 1; }
+
+    .flow-step { display: flex; align-items: flex-start; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .flow-step:last-child { border-bottom: none; }
+    .flow-icon { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 0.85rem; }
+    .flow-icon.ok { background: rgba(63,185,80,0.15); color: var(--green); }
+    .flow-icon.err { background: rgba(248,81,73,0.15); color: var(--red); }
+    .flow-icon.info { background: rgba(88,166,255,0.12); color: var(--blue); }
+    .flow-icon.warn { background: rgba(210,153,34,0.15); color: var(--yellow); }
+    .flow-meta { font-size: 0.72rem; color: var(--text-muted); }
+    .flow-title { font-size: 0.85rem; font-weight: 600; }
+    .status-badge { font-size: 0.7rem; padding: 2px 7px; border-radius: 10px; font-weight: 700; }
+    .status-ok { background: rgba(63,185,80,0.15); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+    .status-err { background: rgba(248,81,73,0.15); color: var(--red); border: 1px solid rgba(248,81,73,0.3); }
+
+    .spinner-border { width: 1rem; height: 1rem; border-width: 2px; }
+
+    .empty-state { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+    .empty-state .bi { font-size: 2rem; opacity: 0.3; display: block; margin-bottom: 10px; }
+
+    .tabs-nav { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+    .tab-btn { padding: 5px 14px; border-radius: 6px; font-size: 0.8rem; border: 1px solid var(--border); background: transparent; color: var(--text-muted); cursor: pointer; transition: all 0.15s; }
+    .tab-btn:hover { background: var(--surface2); color: var(--text); }
+    .tab-btn.active { background: rgba(88,166,255,0.12); color: var(--blue); border-color: rgba(88,166,255,0.3); }
+
+    .help-box { background: rgba(88,166,255,0.05); border: 1px solid rgba(88,166,255,0.15); border-radius: 8px; padding: 12px 14px; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 16px; }
+    .help-box strong { color: var(--blue); }
+    .help-box code { background: var(--surface2); padding: 1px 5px; border-radius: 4px; font-size: 0.75rem; color: var(--orange); }
+
+    textarea.form-control { resize: vertical; min-height: 80px; }
+    textarea.code-area { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.78rem; min-height: 120px; }
+
+    .scope-tags { display: flex; flex-wrap: wrap; gap: 6px; padding: 8px; background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; min-height: 42px; cursor: text; }
+    .scope-tag { background: rgba(88,166,255,0.15); color: var(--blue); border: 1px solid rgba(88,166,255,0.3); border-radius: 4px; padding: 2px 8px; font-size: 0.78rem; display: flex; align-items: center; gap: 4px; }
+    .scope-tag .rm { cursor: pointer; opacity: 0.6; font-size: 0.9em; }
+    .scope-tag .rm:hover { opacity: 1; }
+    .scope-input { border: none; background: transparent; color: var(--text); outline: none; font-size: 0.8rem; min-width: 100px; flex: 1; }
+
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark sticky-top" style="background: var(--surface); border-bottom: 1px solid var(--border);">
+  <div class="container-fluid px-4">
+    <span class="navbar-brand">
+      <i class="bi bi-shield-lock-fill me-2" style="color: var(--blue)"></i>
+      SAML Bearer Token Tester
+      <span class="badge-version ms-2">Okta SAML2.0</span>
+    </span>
+    <div class="d-flex align-items-center gap-2">
+      <button class="btn btn-outline-secondary btn-sm" onclick="saveConfig()">
+        <i class="bi bi-floppy me-1"></i>Save Config
+      </button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="clearConfig()">
+        <i class="bi bi-trash me-1"></i>Clear
+      </button>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid px-4 py-4">
+  <div class="row g-4">
+
+    <!-- Sidebar -->
+    <div class="col-lg-2 d-none d-lg-block">
+      <div class="sidebar">
+        <div class="mb-3" style="font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; padding: 0 12px;">Steps</div>
+        <a href="#step-okta" class="step-link active" id="nav-okta">
+          <span class="step-num">1</span>
+          <span>Okta Config</span>
+        </a>
+        <a href="#step-keys" class="step-link" id="nav-keys">
+          <span class="step-num">2</span>
+          <span>Keys & Certificate</span>
+        </a>
+        <a href="#step-assertion" class="step-link" id="nav-assertion">
+          <span class="step-num">3</span>
+          <span>SAML Assertion</span>
+        </a>
+        <a href="#step-exchange" class="step-link" id="nav-exchange">
+          <span class="step-num">4</span>
+          <span>Token Exchange</span>
+        </a>
+        <a href="#step-decode" class="step-link" id="nav-decode">
+          <span class="step-num"><i class="bi bi-braces" style="font-size:0.65rem"></i></span>
+          <span>Decode Tools</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Main -->
+    <div class="col-lg-10">
+
+      <!-- STEP 1: Okta Config -->
+      <div id="step-okta" class="card mb-4">
+        <div class="card-header">
+          <div class="section-title">
+            <i class="bi bi-building"></i>
+            Step 1 — Okta Configuration
+          </div>
+        </div>
+        <div class="card-body p-4">
+          <div class="help-box">
+            <strong>Prerequisites in Okta:</strong><br>
+            Enable the <strong>SAML 2.0 Assertion</strong> grant type on your OAuth app (Apps → your app → General → Grant types → Advanced).
+            Add a SAML Identity Provider (Security → Identity Providers → Add IdP → SAML 2.0), upload your certificate from Step 2.
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Okta Domain *</label>
+              <input type="text" id="oktaDomain" class="form-control" placeholder="yourorg.okta.com">
+              <div class="input-hint">Your Okta domain without https://</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Authorization Server ID</label>
+              <input type="text" id="authServerId" class="form-control" placeholder="Leave empty for org server (default)">
+              <div class="input-hint">Custom auth server ID (e.g. <code>aus...xxx</code>) — leave blank for org-level server</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Client ID *</label>
+              <input type="text" id="clientId" class="form-control" placeholder="0oa...">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Client Secret *</label>
+              <input type="password" id="clientSecret" class="form-control" placeholder="Client secret">
+              <div class="input-hint">Used in Basic auth header for token exchange</div>
+            </div>
+          </div>
+          <div class="mt-3 p-3" style="background: var(--surface2); border-radius: 8px; font-size: 0.8rem;">
+            <span style="color: var(--text-muted)">Token endpoint preview: </span>
+            <span id="tokenEndpointPreview" style="color: var(--orange); font-family: monospace; font-size: 0.75rem;">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2: Keys -->
+      <div id="step-keys" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="section-title">
+            <i class="bi bi-key-fill"></i>
+            Step 2 — Keys & Certificate
+          </div>
+          <button class="btn btn-primary btn-sm" id="generateKeysBtn" onclick="generateKeyPair()">
+            <i class="bi bi-shuffle me-1"></i>Generate New Key Pair
+          </button>
+        </div>
+        <div class="card-body p-4">
+          <div class="help-box">
+            <strong>After generating:</strong> Copy the certificate and register it in your Okta IdP configuration
+            (Security → Identity Providers → your IdP → Edit → paste certificate under "IdP Certificate").
+            The <strong>Issuer</strong> field in Step 3 must match the IdP Entity ID you configured in Okta.
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label mb-0">Private Key (PEM) *</label>
+                <button class="btn btn-outline-secondary btn-sm" onclick="copyText('privateKey')">
+                  <i class="bi bi-clipboard me-1"></i>Copy
+                </button>
+              </div>
+              <textarea id="privateKey" class="form-control code-area" rows="8" placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"></textarea>
+              <div class="input-hint">Keep this secret — never share or upload to Okta</div>
+            </div>
+            <div class="col-md-6">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label mb-0">Certificate (PEM) *</label>
+                <button class="btn btn-outline-secondary btn-sm" onclick="copyText('certificate')">
+                  <i class="bi bi-clipboard me-1"></i>Copy
+                </button>
+              </div>
+              <textarea id="certificate" class="form-control code-area" rows="8" placeholder="-----BEGIN CERTIFICATE-----&#10;...&#10;-----END CERTIFICATE-----"></textarea>
+              <div class="input-hint">Upload this to Okta IdP configuration</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3: Assertion -->
+      <div id="step-assertion" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="section-title">
+            <i class="bi bi-file-earmark-code"></i>
+            Step 3 — SAML Assertion Configuration
+          </div>
+          <button class="btn btn-primary btn-sm" id="generateAssertionBtn" onclick="generateAssertion()">
+            <i class="bi bi-play-fill me-1"></i>Generate Assertion
+          </button>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Issuer (IdP Entity ID) *</label>
+              <input type="text" id="issuer" class="form-control" placeholder="https://my-idp.example.com">
+              <div class="input-hint">Must match the IdP Entity ID configured in Okta</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Subject (NameID) *</label>
+              <input type="text" id="subject" class="form-control" placeholder="user@example.com">
+              <div class="input-hint">The user identity being asserted</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">NameID Format</label>
+              <select id="nameIdFormat" class="form-select">
+                <option value="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">Email Address</option>
+                <option value="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent">Persistent</option>
+                <option value="urn:oasis:names:tc:SAML:2.0:nameid-format:transient">Transient</option>
+                <option value="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified">Unspecified</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Validity (minutes)</label>
+              <input type="number" id="validityMinutes" class="form-control" value="60" min="1" max="1440">
+              <div class="input-hint">Assertion lifetime — also caps refresh token lifetime</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Audience (SP Entity ID) *</label>
+              <input type="text" id="audience" class="form-control" placeholder="https://www.okta.com/saml2/service-provider/...">
+              <div class="input-hint">From Okta IdP metadata: <code>GET /api/v1/idps/{idpId}/metadata.xml</code></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Recipient (Token Endpoint) *</label>
+              <input type="text" id="recipient" class="form-control" placeholder="Auto-filled from Step 1">
+              <div class="input-hint">SubjectConfirmationData Recipient — should match your token endpoint</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">AuthnContextClassRef</label>
+              <select id="authnContextClass" class="form-select">
+                <option value="urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport">PasswordProtectedTransport</option>
+                <option value="urn:oasis:names:tc:SAML:2.0:ac:classes:Password">Password</option>
+                <option value="urn:oasis:names:tc:SAML:2.0:ac:classes:X509">X509</option>
+                <option value="urn:oasis:names:tc:SAML:2.0:ac:classes:unspecified">Unspecified</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Clock Skew (minutes)</label>
+              <input type="number" id="clockSkewMinutes" class="form-control" value="5" min="0" max="60">
+              <div class="input-hint">NotBefore tolerance (NotBefore = now - skew)</div>
+            </div>
+          </div>
+
+          <!-- Attributes -->
+          <div class="mt-4">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <label class="form-label mb-0">SAML Attributes (optional)</label>
+              <button class="btn btn-outline-secondary btn-sm" onclick="addAttrRow()">
+                <i class="bi bi-plus me-1"></i>Add Attribute
+              </button>
+            </div>
+            <div id="attrRows"></div>
+          </div>
+
+          <!-- Output -->
+          <div id="assertionOutput" class="mt-4" style="display:none">
+            <hr style="border-color: var(--border)">
+            <div class="tabs-nav" id="assertionTabs">
+              <button class="tab-btn active" onclick="showAssertionTab('xml')">Signed XML</button>
+              <button class="tab-btn" onclick="showAssertionTab('b64')">Base64URL</button>
+            </div>
+            <div id="assertionTabXml">
+              <div class="position-relative">
+                <div class="code-block xml" id="assertionXml"></div>
+                <button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('assertionXml')">
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+            </div>
+            <div id="assertionTabB64" style="display:none">
+              <div class="position-relative">
+                <div class="code-block base64" id="assertionB64"></div>
+                <button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('assertionB64')">
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+            </div>
+            <div class="mt-2 d-flex gap-2">
+              <button class="btn btn-outline-secondary btn-sm" onclick="useAssertionForExchange()">
+                <i class="bi bi-arrow-right-circle me-1"></i>Use in Token Exchange
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4: Token Exchange -->
+      <div id="step-exchange" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="section-title">
+            <i class="bi bi-arrow-left-right"></i>
+            Step 4 — Token Exchange
+          </div>
+          <button class="btn btn-primary btn-sm" id="exchangeBtn" onclick="exchangeToken()">
+            <i class="bi bi-send-fill me-1"></i>Exchange Token
+          </button>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Scopes</label>
+              <div class="scope-tags" id="scopeTags" onclick="document.getElementById('scopeInput').focus()">
+                <input type="text" id="scopeInput" class="scope-input" placeholder="Add scope and press Enter..." onkeydown="handleScopeKey(event)">
+              </div>
+              <div class="input-hint">Press Enter or Space to add. Common: <code>openid</code> <code>profile</code> <code>email</code> <code>offline_access</code></div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Assertion (Base64URL)</label>
+              <textarea id="exchangeAssertion" class="form-control code-area" rows="4" placeholder="Base64URL-encoded SAML assertion (auto-filled after Step 3)"></textarea>
+            </div>
+          </div>
+
+          <!-- Result -->
+          <div id="exchangeResult" class="mt-4" style="display:none">
+            <hr style="border-color: var(--border)">
+            <div id="exchangeStatus" class="mb-3"></div>
+
+            <!-- Request -->
+            <div class="mb-3">
+              <div class="d-flex justify-content-between mb-1">
+                <span style="font-size:0.8rem; font-weight:600; color: var(--text-muted)">REQUEST</span>
+              </div>
+              <div class="code-block json" id="requestDetails"></div>
+            </div>
+
+            <!-- Response -->
+            <div class="tabs-nav" id="tokenTabs">
+              <button class="tab-btn active" onclick="showTokenTab('raw')">Raw Response</button>
+              <button class="tab-btn" onclick="showTokenTab('access')">Access Token</button>
+              <button class="tab-btn" onclick="showTokenTab('id')">ID Token</button>
+            </div>
+
+            <div id="tokenTabRaw">
+              <div class="position-relative">
+                <div class="code-block json" id="rawResponse"></div>
+                <button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('rawResponse')">
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+            </div>
+            <div id="tokenTabAccess" style="display:none">
+              <div id="accessTokenDecoded"></div>
+            </div>
+            <div id="tokenTabId" style="display:none">
+              <div id="idTokenDecoded"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Decode Tools -->
+      <div id="step-decode" class="card mb-4">
+        <div class="card-header">
+          <div class="section-title">
+            <i class="bi bi-braces-asterisk"></i>
+            Decode Tools
+          </div>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-4">
+            <div class="col-md-6">
+              <label class="form-label">Decode SAML Assertion (Base64 → XML)</label>
+              <textarea id="decodeAssertionInput" class="form-control code-area" rows="4" placeholder="Paste Base64 or Base64URL encoded assertion"></textarea>
+              <button class="btn btn-outline-secondary btn-sm mt-2" onclick="decodeAssertion()">
+                <i class="bi bi-arrow-down me-1"></i>Decode
+              </button>
+              <div class="position-relative mt-2">
+                <div class="code-block xml" id="decodedAssertionXml" style="min-height:60px"></div>
+                <button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('decodedAssertionXml')">
+                  <i class="bi bi-clipboard"></i>
+                </button>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Decode JWT Token</label>
+              <textarea id="decodeJwtInput" class="form-control code-area" rows="4" placeholder="Paste JWT token (access_token or id_token)"></textarea>
+              <button class="btn btn-outline-secondary btn-sm mt-2" onclick="decodeJwtManual()">
+                <i class="bi bi-arrow-down me-1"></i>Decode
+              </button>
+              <div id="manualJwtDecoded" class="mt-2"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /col-lg-10 -->
+  </div><!-- /row -->
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
