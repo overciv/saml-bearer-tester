@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SAML Bearer Token Tester</title>
+  <title>SAML 2.0 Bearer — Okta OAuth Super Tester</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
   <style>
@@ -118,13 +118,17 @@
 <nav class="navbar navbar-dark sticky-top" style="background: var(--surface); border-bottom: 1px solid var(--border);">
   <div class="container-fluid px-4">
     <span class="navbar-brand">
-      <i class="bi bi-shield-lock-fill me-2" style="color: var(--blue)"></i>
-      SAML Bearer Token Tester
-      <span class="badge-version ms-2">Okta SAML2.0</span>
+      <i class="bi bi-lightning-charge-fill me-2" style="color: var(--blue)"></i>
+      Okta OAuth Super Tester
     </span>
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-3">
+      <div class="d-flex gap-1">
+        <a href="/" class="btn btn-sm" style="background:rgba(88,166,255,0.15);color:var(--blue);border:1px solid rgba(88,166,255,0.3);font-size:0.775rem;">SAML 2.0</a>
+        <a href="/dpop.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">DPoP</a>
+        <a href="/pkjwt.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">Private Key JWT</a>
+      </div>
       <button class="btn btn-outline-secondary btn-sm" onclick="saveConfig()">
-        <i class="bi bi-floppy me-1"></i>Save Config
+        <i class="bi bi-floppy me-1"></i>Save
       </button>
       <button class="btn btn-outline-secondary btn-sm" onclick="clearConfig()">
         <i class="bi bi-trash me-1"></i>Clear
