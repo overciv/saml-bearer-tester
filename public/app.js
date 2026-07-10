@@ -6,11 +6,32 @@ let scopeList = ['openid'];
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  initNavAuth();
   loadConfig();
   renderScopes();
   setupTokenEndpointPreview();
   setupAutoFill();
 });
+
+// Check auth status and show user in navbar (self-contained, no common.js dependency)
+async function initNavAuth() {
+  const navArea = document.getElementById('navAuthArea');
+  if (!navArea) return;
+  try {
+    const r = await fetch('/api/auth/me');
+    if (r.status === 401) {
+      window.location.href = '/auth/login?returnTo=' + encodeURIComponent(window.location.pathname);
+      return;
+    }
+    const data = await r.json();
+    if (data.user) {
+      navArea.innerHTML = `<div class="d-flex align-items-center gap-2">
+        <span style="font-size:0.78rem;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(data.user.name || data.user.email || data.user.sub)}</span>
+        <a href="/auth/logout" class="btn btn-outline-secondary btn-sm" style="font-size:0.72rem;padding:2px 8px;white-space:nowrap">Logout</a>
+      </div>`;
+    }
+  } catch { /* server not ready */ }
+}
 
 function setupTokenEndpointPreview() {
   ['oktaDomain', 'authServerId'].forEach(id => {
@@ -336,10 +357,31 @@ function saveConfig() {
   cfg.scopes = [...scopeList];
   cfg.attributes = collectAttributes();
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+
+  // Sync global fields
+  const GLOBAL = ['oktaDomain', 'authServerId', 'clientId'];
+  const existing = JSON.parse(localStorage.getItem('oauthst-global') || '{}');
+  const update = {};
+  GLOBAL.forEach(id => { if (cfg[id]) update[id] = cfg[id]; });
+  localStorage.setItem('oauthst-global', JSON.stringify({ ...existing, ...update }));
+
   toast('Configuration saved', 'success');
 }
 
 function loadConfig() {
+  // Global settings first (lower priority)
+  try {
+    const globalRaw = localStorage.getItem('oauthst-global');
+    if (globalRaw) {
+      const global = JSON.parse(globalRaw);
+      ['oktaDomain', 'authServerId', 'clientId'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && global[id]) el.value = global[id];
+      });
+    }
+  } catch {}
+
+  // Page-specific overrides globals
   const raw = localStorage.getItem(CONFIG_KEY);
   if (!raw) return;
   try {

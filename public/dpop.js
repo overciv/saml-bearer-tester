@@ -7,6 +7,7 @@ let currentPrivateJwk = null;
 let currentPublicJwk = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+  initNavAuth();
   loadPageConfig('dpop', CONFIG_FIELDS);
   scopeMgr = createScopeManager('scopeTags', 'scopeInput', ['openid']);
   setupEndpointPreview();

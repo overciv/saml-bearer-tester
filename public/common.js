@@ -161,15 +161,38 @@ function createScopeManager(containerId, inputId, initial = []) {
   return { state, add, remove, render };
 }
 
+// Global fields synced across all tester pages via oauthst-global
+const GLOBAL_FIELDS = ['oktaDomain', 'authServerId', 'clientId'];
+
 // Config persistence per page prefix
 function savePageConfig(prefix, fieldIds) {
   const cfg = {};
   fieldIds.forEach(id => { cfg[id] = document.getElementById(id)?.value || ''; });
   localStorage.setItem(`oauthst-${prefix}`, JSON.stringify(cfg));
+
+  // Sync shared fields to oauthst-global
+  const existing = JSON.parse(localStorage.getItem('oauthst-global') || '{}');
+  const update = {};
+  fieldIds.filter(id => GLOBAL_FIELDS.includes(id)).forEach(id => { if (cfg[id]) update[id] = cfg[id]; });
+  if (Object.keys(update).length) localStorage.setItem('oauthst-global', JSON.stringify({ ...existing, ...update }));
+
   toast('Configuration saved', 'success');
 }
 
 function loadPageConfig(prefix, fieldIds) {
+  // Global settings first (lower priority baseline)
+  try {
+    const globalRaw = localStorage.getItem('oauthst-global');
+    if (globalRaw) {
+      const global = JSON.parse(globalRaw);
+      fieldIds.filter(id => GLOBAL_FIELDS.includes(id)).forEach(id => {
+        const el = document.getElementById(id);
+        if (el && global[id]) el.value = global[id];
+      });
+    }
+  } catch {}
+
+  // Page-specific settings override globals
   try {
     const raw = localStorage.getItem(`oauthst-${prefix}`);
     if (!raw) return;
@@ -186,6 +209,25 @@ function clearPageConfig(prefix, fieldIds) {
   localStorage.removeItem(`oauthst-${prefix}`);
   fieldIds.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
   toast('Configuration cleared', 'info');
+}
+
+// Auth: check login status and update navbar
+async function initNavAuth() {
+  const navArea = document.getElementById('navAuthArea');
+  try {
+    const r = await fetch('/api/auth/me');
+    if (r.status === 401) {
+      window.location.href = '/auth/login?returnTo=' + encodeURIComponent(window.location.pathname + window.location.search);
+      return;
+    }
+    const data = await r.json();
+    if (navArea && data.user) {
+      navArea.innerHTML = `<div class="d-flex align-items-center gap-2">
+        <span style="font-size:0.78rem;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(data.user.name || data.user.email || data.user.sub)}</span>
+        <a href="/auth/logout" class="btn btn-outline-secondary btn-sm" style="font-size:0.72rem;padding:2px 8px;white-space:nowrap">Logout</a>
+      </div>`;
+    }
+  } catch { /* server not yet ready — ignore */ }
 }
 
 // Status badge
