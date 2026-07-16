@@ -14,6 +14,7 @@ const DEFAULTS = {
   authServerId: '',
   clientId: '',
   clientSecret: '',
+  adminApiToken: '',
   authEnabled: false,
   authClientId: '',
   authScopes: ['openid', 'profile', 'email'],
@@ -90,7 +91,8 @@ function getPublicConfig() {
     oktaDomain: cfg.oktaDomain,
     authServerId: cfg.authServerId,
     clientId: cfg.clientId,
-    clientSecret: cfg.clientSecret,   // included — local dev tool only
+    clientSecret: cfg.clientSecret,
+    adminApiToken: cfg.adminApiToken,
     authEnabled: cfg.authEnabled,
     authClientId: cfg.authClientId,
     authScopes: cfg.authScopes,

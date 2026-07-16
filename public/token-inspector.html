@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Token Inspector — Okta OAuth Super Tester</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
+  <style>
+    :root { --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--text:#c9d1d9;--text-muted:#8b949e;--blue:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--purple:#bc8cff;--orange:#ffa657;--teal:#2dd9c6;--amber:#e3b341; }
+    body { background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,monospace; }
+    .navbar-brand { font-weight:700;font-size:1.1rem; }
+    .card { background:var(--surface);border:1px solid var(--border);border-radius:10px; }
+    .card-header { background:var(--surface2);border-bottom:1px solid var(--border);border-radius:10px 10px 0 0 !important;padding:14px 20px; }
+    .section-title { font-weight:600;font-size:0.95rem;display:flex;align-items:center;gap:8px; }
+    .section-title .bi { color:var(--amber); }
+    .form-control,.form-select { background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:0.875rem; }
+    .form-control:focus,.form-select:focus { background:var(--surface2);border-color:var(--amber);color:var(--text);box-shadow:0 0 0 3px rgba(227,179,65,0.15); }
+    .form-control::placeholder { color:var(--text-muted); }
+    .form-label { font-size:0.8rem;color:var(--text-muted);font-weight:500;margin-bottom:4px; }
+    .input-hint { font-size:0.72rem;color:var(--text-muted);margin-top:3px; }
+    .btn-primary { background:var(--amber);border-color:var(--amber);color:#0d1117;font-weight:600; }
+    .btn-primary:hover { background:#f5cc55;border-color:#f5cc55;color:#0d1117; }
+    .btn-outline-secondary { border-color:var(--border);color:var(--text-muted);font-size:0.8rem; }
+    .btn-outline-secondary:hover { background:var(--surface2);color:var(--text); }
+    .btn-danger { font-size:0.8rem; }
+    .btn-sm { padding:4px 10px;font-size:0.775rem; }
+    .code-block { background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:'SF Mono','Fira Code',monospace;font-size:0.78rem;line-height:1.6;overflow:auto;max-height:380px;position:relative;white-space:pre-wrap;word-break:break-all; }
+    .code-block.json { color:#b5cea8; }
+    .copy-btn { position:absolute;top:8px;right:8px;z-index:10; }
+    textarea.form-control { resize:vertical; }
+    textarea.code-area { font-family:'SF Mono','Fira Code',monospace;font-size:0.78rem;min-height:80px; }
+    .help-box { background:rgba(227,179,65,0.05);border:1px solid rgba(227,179,65,0.2);border-radius:8px;padding:12px 14px;font-size:0.8rem;color:var(--text-muted); }
+    .help-box strong { color:var(--amber); }
+    .help-box code { background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:0.75rem;color:var(--orange); }
+    .status-badge { font-size:0.7rem;padding:2px 7px;border-radius:10px;font-weight:700; }
+    .status-ok { background:rgba(63,185,80,0.15);color:var(--green);border:1px solid rgba(63,185,80,0.3); }
+    .status-err { background:rgba(248,81,73,0.15);color:var(--red);border:1px solid rgba(248,81,73,0.3); }
+    .spinner-border { width:1rem;height:1rem;border-width:2px; }
+    .tabs-nav { display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap; }
+    .tab-btn { padding:5px 14px;border-radius:6px;font-size:0.8rem;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all 0.15s; }
+    .tab-btn:hover { background:var(--surface2);color:var(--text); }
+    .tab-btn.active { background:rgba(227,179,65,0.1);color:var(--amber);border-color:rgba(227,179,65,0.3); }
+
+    /* Token type badge */
+    .token-type-badge { display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;font-size:0.75rem;font-weight:700; }
+    .badge-user    { background:rgba(88,166,255,0.12);color:var(--blue);border:1px solid rgba(88,166,255,0.3); }
+    .badge-machine { background:rgba(63,185,80,0.1);color:var(--green);border:1px solid rgba(63,185,80,0.3); }
+    .badge-id      { background:rgba(188,140,255,0.1);color:var(--purple);border:1px solid rgba(188,140,255,0.3); }
+
+    /* Claims table */
+    .claims-table { width:100%;border-collapse:collapse;font-size:0.8rem; }
+    .claims-table th { padding:8px 12px;text-align:left;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);border-bottom:2px solid var(--border);background:var(--surface2); }
+    .claims-table td { padding:8px 12px;border-bottom:1px solid rgba(48,54,61,0.6);vertical-align:top; }
+    .claims-table tr:last-child td { border-bottom:none; }
+    .claims-table tr:hover td { background:rgba(255,255,255,0.02); }
+    .claim-name { font-family:monospace;font-weight:700;color:var(--amber); }
+    .claim-val { font-family:monospace;color:var(--text);word-break:break-all;max-width:200px; }
+    .claim-std { font-size:0.7rem;color:var(--blue);font-family:monospace; }
+    .claim-desc { color:var(--text-muted);font-size:0.75rem;line-height:1.4; }
+
+    /* Type badges */
+    .type-native { background:rgba(63,185,80,0.12);color:var(--green);border:1px solid rgba(63,185,80,0.25);border-radius:4px;padding:1px 6px;font-size:0.68rem;font-weight:700;white-space:nowrap; }
+    .type-configurable { background:rgba(88,166,255,0.1);color:var(--blue);border:1px solid rgba(88,166,255,0.25);border-radius:4px;padding:1px 6px;font-size:0.68rem;font-weight:700;white-space:nowrap; }
+    .type-mappable { background:rgba(188,140,255,0.1);color:var(--purple);border:1px solid rgba(188,140,255,0.25);border-radius:4px;padding:1px 6px;font-size:0.68rem;font-weight:700;white-space:nowrap; }
+    .type-custom { background:rgba(255,166,87,0.1);color:var(--orange);border:1px solid rgba(255,166,87,0.25);border-radius:4px;padding:1px 6px;font-size:0.68rem;font-weight:700;white-space:nowrap; }
+
+    /* Revocation flow */
+    .flow-step { border:1px solid var(--border);border-radius:7px;margin-bottom:8px;overflow:hidden; }
+    .flow-step-hdr { padding:8px 12px;display:flex;align-items:center;gap:8px;background:var(--surface2);cursor:pointer;font-size:0.8rem; }
+    .flow-step-hdr:hover { background:rgba(255,255,255,0.03); }
+    .flow-step-body { padding:12px;border-top:1px solid var(--border);display:none; }
+    .flow-step-body.open { display:block; }
+    .step-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
+    .dot-ok { background:var(--green); }
+    .dot-err { background:var(--red); }
+    .dot-neutral { background:var(--text-muted); }
+
+    /* Lifetime table */
+    .lifetime-table { width:100%;border-collapse:collapse;font-size:0.8rem; }
+    .lifetime-table th { padding:8px 12px;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);border-bottom:2px solid var(--border);background:var(--surface2); }
+    .lifetime-table td { padding:8px 12px;border-bottom:1px solid rgba(48,54,61,0.6);vertical-align:top; }
+    .lifetime-table tr:last-child td { border-bottom:none; }
+    .ttl-val { font-family:monospace;font-weight:700;color:var(--amber); }
+
+    .step-link { display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--text-muted);text-decoration:none;font-size:0.875rem;transition:all 0.15s;margin-bottom:2px; }
+    .step-link:hover { background:var(--surface2);color:var(--text); }
+    .step-num { width:22px;height:22px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;flex-shrink:0; }
+    ::-webkit-scrollbar { width:6px;height:6px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:var(--border);border-radius:3px; }
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-dark sticky-top" style="background:var(--surface);border-bottom:1px solid var(--border);">
+  <div class="container-fluid px-4">
+    <span class="navbar-brand"><i class="bi bi-lightning-charge-fill me-2" style="color:var(--blue)"></i>Okta OAuth Super Tester</span>
+    <div class="d-flex align-items-center gap-3">
+      <div class="d-flex gap-1 flex-wrap">
+        <a href="/" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">SAML 2.0</a>
+        <a href="/dpop.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">DPoP</a>
+        <a href="/pkjwt.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">Private Key JWT</a>
+        <a href="/ciba.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">CIBA</a>
+        <a href="/token-exchange.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">Token Exchange</a>
+        <a href="/token-inspector.html" class="btn btn-sm" style="background:rgba(227,179,65,0.12);color:var(--amber);border:1px solid rgba(227,179,65,0.3);font-size:0.775rem;">Token Inspector</a>
+        <a href="/admin.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">Admin API</a>
+        <a href="/settings.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;"><i class="bi bi-gear-fill"></i></a>
+      </div>
+      <div id="navAuthArea"></div>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid px-4 py-4">
+  <div class="row g-4">
+    <div class="col-lg-2 d-none d-lg-block">
+      <div style="position:sticky;top:70px;">
+        <div class="mb-3" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;padding:0 12px;">Sections</div>
+        <a href="#sec-inspect" class="step-link"><span class="step-num"><i class="bi bi-search" style="font-size:0.65rem"></i></span><span>Inspect Token</span></a>
+        <a href="#sec-revoke" class="step-link"><span class="step-num"><i class="bi bi-x-circle" style="font-size:0.65rem"></i></span><span>Revoke &amp; Verify</span></a>
+        <a href="#sec-lifetime" class="step-link"><span class="step-num"><i class="bi bi-clock" style="font-size:0.65rem"></i></span><span>Token Lifetime</span></a>
+        <div style="margin:16px 12px 6px;font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Type Legend</div>
+        <div style="padding:0 12px;font-size:0.72rem;line-height:2.2">
+          <span class="type-native">native</span> RFC-defined, always present<br>
+          <span class="type-configurable">configurable</span> Native but TTL/value editable<br>
+          <span class="type-mappable">mappable</span> Via OIDC claim mapping<br>
+          <span class="type-custom">custom</span> User-defined claim
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-10">
+
+      <!-- Token Inspect -->
+      <div id="sec-inspect" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="section-title"><i class="bi bi-search"></i>Token Inspector — RFC Claim Analysis</div>
+          <button class="btn btn-primary btn-sm" id="inspectBtn" onclick="inspectToken()"><i class="bi bi-search me-1"></i>Inspect</button>
+        </div>
+        <div class="card-body p-4">
+          <div class="help-box mb-4">
+            <strong>Thématique 2.1</strong> — Paste any token (access_token or id_token) to get a full RFC-annotated claim breakdown.
+            Each claim is tagged with its standard origin (RFC 7519, OIDC Core, RFC 8176…) and whether it is
+            <span class="type-native">native</span> (always present), <span class="type-configurable">configurable</span> (editable TTL/value),
+            <span class="type-mappable">mappable</span> (via claim mapping), or <span class="type-custom">custom</span> (user-defined).
+          </div>
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Token (access_token or id_token)</label>
+              <textarea id="inspectTokenInput" class="form-control code-area" rows="3" placeholder="eyJraWQ..."></textarea>
+            </div>
+          </div>
+          <div id="inspectOutput" class="mt-4" style="display:none">
+            <div id="tokenSummary" class="mb-3 p-3" style="background:var(--surface2);border-radius:8px;display:flex;align-items:center;gap:12px;flex-wrap:wrap"></div>
+            <div class="table-responsive">
+              <table class="claims-table">
+                <thead><tr><th>Claim</th><th>Value</th><th>Standard</th><th>Type</th><th>Description</th></tr></thead>
+                <tbody id="claimsTableBody"></tbody>
+              </table>
+            </div>
+            <div class="mt-3 d-flex gap-2">
+              <button class="btn btn-outline-secondary btn-sm" onclick="useInInspectRevoke()"><i class="bi bi-arrow-down me-1"></i>Use in Revoke</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Revoke & Verify -->
+      <div id="sec-revoke" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="section-title"><i class="bi bi-x-circle"></i>Token Revocation (RFC 7009) — Immediate Revoke &amp; Verify</div>
+          <button class="btn btn-danger btn-sm" id="revokeBtn" onclick="revokeToken()"><i class="bi bi-x-circle me-1"></i>Revoke Token</button>
+        </div>
+        <div class="card-body p-4">
+          <div class="help-box mb-4">
+            <strong>Thématique 2.3</strong> — Revoke a token via RFC 7009 (<code>POST /v1/revoke</code>), then immediately
+            verify the revocation with <code>POST /v1/introspect</code>. A revoked token must return <code>"active": false</code>.
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Okta Domain *</label><input type="text" id="revOktaDomain" class="form-control" placeholder="yourorg.okta.com"></div>
+            <div class="col-md-6"><label class="form-label">Authorization Server ID</label><input type="text" id="revAuthServerId" class="form-control" placeholder="Leave empty for org-level"></div>
+            <div class="col-md-6"><label class="form-label">Client ID *</label><input type="text" id="revClientId" class="form-control"></div>
+            <div class="col-md-6"><label class="form-label">Client Secret *</label><input type="password" id="revClientSecret" class="form-control"></div>
+            <div class="col-md-4">
+              <label class="form-label">Token Type Hint</label>
+              <select id="revTokenTypeHint" class="form-select">
+                <option value="access_token">access_token</option>
+                <option value="refresh_token">refresh_token</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Token to Revoke *</label>
+              <textarea id="revToken" class="form-control code-area" rows="2" placeholder="eyJraWQ..."></textarea>
+            </div>
+          </div>
+          <div id="revokeOutput" class="mt-4" style="display:none">
+            <hr style="border-color:var(--border)">
+            <div id="revokeSteps"></div>
+            <div id="revokeFinalStatus" class="mt-2 p-3" style="background:var(--surface2);border-radius:8px;font-size:0.82rem;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Token Lifetime -->
+      <div id="sec-lifetime" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="section-title"><i class="bi bi-clock"></i>Token Lifetime — Auth Server Policy Inspector</div>
+          <button class="btn btn-primary btn-sm" id="lifetimeBtn" onclick="fetchLifetime()"><i class="bi bi-arrow-clockwise me-1"></i>Fetch Policies</button>
+        </div>
+        <div class="card-body p-4">
+          <div class="help-box mb-4">
+            <strong>Thématique 2.2</strong> — Query the authorization server's access policies to show token TTL settings
+            per policy rule (access token lifetime, refresh token lifetime, sliding window).
+            Requires the Admin API Token configured in Settings.
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Okta Domain *</label><input type="text" id="ltOktaDomain" class="form-control" placeholder="yourorg.okta.com"></div>
+            <div class="col-md-6"><label class="form-label">Authorization Server ID</label><input type="text" id="ltAuthServerId" class="form-control" placeholder="default or aus..."></div>
+            <div class="col-12">
+              <label class="form-label">Admin API Token (SSWS)</label>
+              <input type="password" id="ltAdminToken" class="form-control" placeholder="00YXSE_... (pre-filled from Settings)">
+            </div>
+          </div>
+          <div id="lifetimeOutput" class="mt-4" style="display:none">
+            <hr style="border-color:var(--border)">
+            <div id="lifetimeServerInfo" class="mb-3 p-3" style="background:var(--surface2);border-radius:8px;font-size:0.82rem;"></div>
+            <div id="lifetimePolicies"></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="common.js"></script>
+<script src="token-inspector.js"></script>
+</body>
+</html>

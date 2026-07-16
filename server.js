@@ -9,6 +9,8 @@ const { generateDpopKeyPair, generateDpopProof, validateDpopProof } = require('.
 const { generatePkjwtKeyPair, generateClientAssertion, validateClientAssertion } = require('./src/pkjwt');
 const { backchannelAuthorize, pollToken } = require('./src/ciba');
 const { exchange: tokenExchange } = require('./src/token-exchange');
+const { revokeAndVerify, getTokenLifetime } = require('./src/token-inspector');
+const { createApp, getApp, cloneApp, findUser, listFactors, resetFactor, getSystemLog } = require('./src/admin-api');
 const { getConfig, saveConfig, getSigningKey, generateSigningKey, getPublicJwks, getPublicConfig } = require('./src/config');
 const { requireAuth, loginHandler, callbackHandler, logoutHandler, meHandler } = require('./src/auth');
 
@@ -200,6 +202,55 @@ app.post('/api/pkjwt/introspect', async (req, res) => {
 
 // ─── CIBA routes ──────────────────────────────────────────────────────────────
 
+// ─── Token Inspector routes (Thématique 2) ────────────────────────────────────
+
+app.post('/api/token/revoke-and-verify', async (req, res) => {
+  try { res.json(await revokeAndVerify(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/token/lifetime', async (req, res) => {
+  try { res.json(await getTokenLifetime(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Admin API routes (Thématique 3) ─────────────────────────────────────────
+
+app.post('/api/admin/create-app', async (req, res) => {
+  try { res.json(await createApp(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/get-app', async (req, res) => {
+  try { res.json(await getApp(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/clone-app', async (req, res) => {
+  try { res.json(await cloneApp(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/find-user', async (req, res) => {
+  try { res.json(await findUser(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/list-factors', async (req, res) => {
+  try { res.json(await listFactors(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/reset-factor', async (req, res) => {
+  try { res.json(await resetFactor(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/system-log', async (req, res) => {
+  try { res.json(await getSystemLog(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 // ─── Token Exchange routes (RFC 8693) ────────────────────────────────────────
 
 app.post('/api/token-exchange/exchange', async (req, res) => {
@@ -246,6 +297,8 @@ app.post('/api/introspect', async (req, res) => {
     console.log(`   Priv Key JWT → http://localhost:${PORT}/pkjwt.html`);
   console.log(`   CIBA         → http://localhost:${PORT}/ciba.html`);
   console.log(`   Token Exch   → http://localhost:${PORT}/token-exchange.html`);
+  console.log(`   Token Insp   → http://localhost:${PORT}/token-inspector.html`);
+  console.log(`   Admin API    → http://localhost:${PORT}/admin.html`);
     console.log(`   Settings    →  http://localhost:${PORT}/settings.html\n`);
   });
 })();

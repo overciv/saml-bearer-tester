@@ -59,6 +59,8 @@
         <a href="/pkjwt.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">Private Key JWT</a>
         <a href="/ciba.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">CIBA</a>
         <a href="/token-exchange.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">Token Exchange</a>
+        <a href="/token-inspector.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">Token Inspector</a>
+        <a href="/admin.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">Admin API</a>
         <a href="/settings.html" class="btn btn-sm" style="background:rgba(88,166,255,0.15);color:var(--blue);border:1px solid rgba(88,166,255,0.3);font-size:0.775rem;"><i class="bi bi-gear-fill me-1"></i>Settings</a>
       </div>
       <div id="navAuthArea"></div>
@@ -94,6 +96,11 @@
         <div class="col-md-6">
           <label class="form-label">Client Secret (for testing flows)</label>
           <input type="password" id="clientSecret" class="form-control" placeholder="Used by SAML and DPoP token exchange">
+        </div>
+        <div class="col-12">
+          <label class="form-label">Admin API Token (SSWS) <span style="color:var(--text-muted)">— Token Inspector lifetime &amp; Admin API</span></label>
+          <input type="password" id="adminApiToken" class="form-control" placeholder="00YXSE_... (Admin Console → Security → API → Tokens)">
+          <div class="input-hint">Used for Okta Management API: app lifecycle, MFA management, audit log, token policies. Stored server-side only.</div>
         </div>
       </div>
       <div class="mt-3 p-3" style="background:var(--surface2);border-radius:8px;font-size:0.8rem;">

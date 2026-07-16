@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin API — Okta OAuth Super Tester</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
+  <style>
+    :root { --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--text:#c9d1d9;--text-muted:#8b949e;--blue:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--purple:#bc8cff;--orange:#ffa657;--teal:#2dd9c6;--emerald:#3dcb7a; }
+    body { background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,monospace; }
+    .navbar-brand { font-weight:700;font-size:1.1rem; }
+    .card { background:var(--surface);border:1px solid var(--border);border-radius:10px; }
+    .card-header { background:var(--surface2);border-bottom:1px solid var(--border);border-radius:10px 10px 0 0 !important;padding:14px 20px; }
+    .section-title { font-weight:600;font-size:0.95rem;display:flex;align-items:center;gap:8px; }
+    .section-title .bi { color:var(--emerald); }
+    .form-control,.form-select { background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:0.875rem; }
+    .form-control:focus,.form-select:focus { background:var(--surface2);border-color:var(--emerald);color:var(--text);box-shadow:0 0 0 3px rgba(61,203,122,0.15); }
+    .form-control::placeholder { color:var(--text-muted); }
+    .form-label { font-size:0.8rem;color:var(--text-muted);font-weight:500;margin-bottom:4px; }
+    .input-hint { font-size:0.72rem;color:var(--text-muted);margin-top:3px; }
+    .btn-primary { background:var(--emerald);border-color:var(--emerald);color:#0d1117;font-weight:600; }
+    .btn-primary:hover { background:#5de08f;border-color:#5de08f;color:#0d1117; }
+    .btn-outline-secondary { border-color:var(--border);color:var(--text-muted);font-size:0.8rem; }
+    .btn-outline-secondary:hover { background:var(--surface2);color:var(--text); }
+    .btn-sm { padding:4px 10px;font-size:0.775rem; }
+    .code-block { background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:'SF Mono','Fira Code',monospace;font-size:0.78rem;line-height:1.6;overflow:auto;max-height:400px;position:relative;white-space:pre-wrap;word-break:break-all;color:#b5cea8; }
+    .copy-btn { position:absolute;top:8px;right:8px;z-index:10; }
+    textarea.form-control { resize:vertical; }
+    textarea.code-area { font-family:'SF Mono','Fira Code',monospace;font-size:0.78rem;min-height:80px; }
+    .help-box { background:rgba(61,203,122,0.04);border:1px solid rgba(61,203,122,0.15);border-radius:8px;padding:12px 14px;font-size:0.8rem;color:var(--text-muted);margin-bottom:16px; }
+    .help-box strong { color:var(--emerald); }
+    .help-box code { background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:0.75rem;color:var(--orange); }
+    .status-badge { font-size:0.7rem;padding:2px 7px;border-radius:10px;font-weight:700; }
+    .status-ok { background:rgba(63,185,80,0.15);color:var(--green);border:1px solid rgba(63,185,80,0.3); }
+    .status-err { background:rgba(248,81,73,0.15);color:var(--red);border:1px solid rgba(248,81,73,0.3); }
+    .spinner-border { width:1rem;height:1rem;border-width:2px; }
+    .tabs-nav { display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap; }
+    .tab-btn { padding:5px 14px;border-radius:6px;font-size:0.8rem;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all 0.15s; }
+    .tab-btn:hover { background:var(--surface2);color:var(--text); }
+    .tab-btn.active { background:rgba(61,203,122,0.1);color:var(--emerald);border-color:rgba(61,203,122,0.3); }
+
+    /* Factor table */
+    .factor-table { width:100%;border-collapse:collapse;font-size:0.82rem; }
+    .factor-table th { padding:8px 12px;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted);border-bottom:2px solid var(--border);background:var(--surface2); }
+    .factor-table td { padding:8px 12px;border-bottom:1px solid rgba(48,54,61,0.6);vertical-align:middle; }
+    .factor-table tr:last-child td { border-bottom:none; }
+    .factor-status-active { color:var(--green);font-weight:600; }
+    .factor-status-inactive { color:var(--text-muted); }
+
+    /* Log timeline */
+    .log-entry { border-left:2px solid var(--border);padding:6px 12px;margin-bottom:6px;font-size:0.78rem; }
+    .log-entry.success { border-left-color:var(--green); }
+    .log-entry.failure { border-left-color:var(--red); }
+    .log-entry.unknown { border-left-color:var(--text-muted); }
+    .log-time { color:var(--text-muted);font-size:0.7rem;font-family:monospace; }
+    .log-event { font-weight:600;color:var(--text); }
+    .log-actor { color:var(--blue);font-size:0.75rem; }
+    .log-target { color:var(--orange);font-size:0.75rem; }
+
+    .step-link { display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--text-muted);text-decoration:none;font-size:0.875rem;transition:all 0.15s;margin-bottom:2px; }
+    .step-link:hover { background:var(--surface2);color:var(--text); }
+    .step-num { width:22px;height:22px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;flex-shrink:0; }
+
+    /* Checkbox group */
+    .grant-checks { display:flex;flex-wrap:wrap;gap:8px; }
+    .grant-check { display:flex;align-items:center;gap:5px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;font-size:0.78rem;cursor:pointer; }
+    .grant-check input { cursor:pointer; }
+
+    ::-webkit-scrollbar { width:6px;height:6px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:var(--border);border-radius:3px; }
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-dark sticky-top" style="background:var(--surface);border-bottom:1px solid var(--border);">
+  <div class="container-fluid px-4">
+    <span class="navbar-brand"><i class="bi bi-lightning-charge-fill me-2" style="color:var(--blue)"></i>Okta OAuth Super Tester</span>
+    <div class="d-flex align-items-center gap-3">
+      <div class="d-flex gap-1 flex-wrap">
+        <a href="/" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">SAML 2.0</a>
+        <a href="/dpop.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">DPoP</a>
+        <a href="/pkjwt.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">Private Key JWT</a>
+        <a href="/ciba.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">CIBA</a>
+        <a href="/token-exchange.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">Token Exchange</a>
+        <a href="/token-inspector.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">Token Inspector</a>
+        <a href="/admin.html" class="btn btn-sm" style="background:rgba(61,203,122,0.1);color:var(--emerald);border:1px solid rgba(61,203,122,0.3);font-size:0.775rem;">Admin API</a>
+        <a href="/settings.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;"><i class="bi bi-gear-fill"></i></a>
+      </div>
+      <div id="navAuthArea"></div>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid px-4 py-4">
+  <div class="row g-4">
+    <div class="col-lg-2 d-none d-lg-block">
+      <div style="position:sticky;top:70px;">
+        <div class="mb-3" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;padding:0 12px;">Sections</div>
+        <a href="#sec-config" class="step-link"><span class="step-num"><i class="bi bi-key" style="font-size:0.65rem"></i></span><span>Admin Config</span></a>
+        <a href="#sec-app" class="step-link"><span class="step-num"><i class="bi bi-app" style="font-size:0.65rem"></i></span><span>App Lifecycle</span></a>
+        <a href="#sec-mfa" class="step-link"><span class="step-num"><i class="bi bi-shield-lock" style="font-size:0.65rem"></i></span><span>MFA by API</span></a>
+        <a href="#sec-log" class="step-link"><span class="step-num"><i class="bi bi-journal-text" style="font-size:0.65rem"></i></span><span>Audit Log</span></a>
+      </div>
+    </div>
+    <div class="col-lg-10">
+
+      <!-- Admin Config -->
+      <div id="sec-config" class="card mb-4">
+        <div class="card-header"><div class="section-title"><i class="bi bi-key-fill"></i>Admin Configuration</div></div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Okta Domain *</label><input type="text" id="adminDomain" class="form-control" placeholder="yourorg.okta.com"></div>
+            <div class="col-md-6"><label class="form-label">Admin API Token (SSWS) *</label><input type="password" id="adminToken" class="form-control" placeholder="00YXSE_... (pre-filled from Settings)"></div>
+          </div>
+          <div class="mt-2" style="font-size:0.78rem;color:var(--text-muted)">All admin operations below use this token. Keep it confidential — it has full admin access to your Okta tenant.</div>
+        </div>
+      </div>
+
+      <!-- App Lifecycle -->
+      <div id="sec-app" class="card mb-4">
+        <div class="card-header"><div class="section-title"><i class="bi bi-app-indicator"></i>App Lifecycle — Self-Service via Okta API</div></div>
+        <div class="card-body p-4">
+          <div class="help-box">
+            <strong>Thématique 3.2</strong> — Demonstrate 100% API-driven app creation, export, and cloning without touching the Admin Console.
+            This proves the self-service / GitOps capability: every app can be created, exported as versioned JSON, and promoted between environments.
+          </div>
+          <div class="tabs-nav" id="appTabs">
+            <button class="tab-btn active" onclick="showAppTab('create')"><i class="bi bi-plus-circle me-1"></i>Create App</button>
+            <button class="tab-btn" onclick="showAppTab('export')"><i class="bi bi-download me-1"></i>Export App</button>
+            <button class="tab-btn" onclick="showAppTab('clone')"><i class="bi bi-copy me-1"></i>Clone App</button>
+          </div>
+
+          <!-- Create -->
+          <div id="appTabCreate">
+            <div class="row g-3">
+              <div class="col-md-6"><label class="form-label">App Label *</label><input type="text" id="appLabel" class="form-control" placeholder="My New OIDC App"></div>
+              <div class="col-md-3">
+                <label class="form-label">App Type</label>
+                <select id="appType" class="form-select">
+                  <option value="web">Web (server-side)</option>
+                  <option value="browser">SPA / Browser</option>
+                  <option value="native">Native / Mobile</option>
+                  <option value="service">Service (M2M)</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label">Client Auth Method</label>
+                <select id="appAuthMethod" class="form-select">
+                  <option value="client_secret_basic">client_secret_basic</option>
+                  <option value="client_secret_post">client_secret_post</option>
+                  <option value="private_key_jwt">private_key_jwt</option>
+                  <option value="none">none (PKCE only)</option>
+                </select>
+              </div>
+              <div class="col-12">
+                <label class="form-label">Redirect URIs <span style="color:var(--text-muted)">(one per line)</span></label>
+                <textarea id="appRedirectUris" class="form-control" rows="2" placeholder="https://myapp.example.com/callback&#10;http://localhost:3000/callback"></textarea>
+              </div>
+              <div class="col-12">
+                <label class="form-label">Grant Types</label>
+                <div class="grant-checks">
+                  <label class="grant-check"><input type="checkbox" id="grant_authcode" checked> authorization_code</label>
+                  <label class="grant-check"><input type="checkbox" id="grant_refresh" checked> refresh_token</label>
+                  <label class="grant-check"><input type="checkbox" id="grant_creds"> client_credentials</label>
+                  <label class="grant-check"><input type="checkbox" id="grant_device"> device_code</label>
+                  <label class="grant-check"><input type="checkbox" id="grant_tokex"> token-exchange</label>
+                  <label class="grant-check"><input type="checkbox" id="grant_saml"> saml2-bearer</label>
+                </div>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm mt-3" id="createAppBtn" onclick="createApp()"><i class="bi bi-plus-circle me-1"></i>Create App via API</button>
+            <div id="createAppOutput" class="mt-3" style="display:none">
+              <div id="createAppStatus" class="mb-2"></div>
+              <div class="tabs-nav" id="createAppTabs">
+                <button class="tab-btn active" onclick="showCreateTab('payload')">Request Payload</button>
+                <button class="tab-btn" onclick="showCreateTab('response')">Response</button>
+              </div>
+              <div id="createTabPayload"><div class="position-relative"><div class="code-block" id="createPayloadEl"></div><button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('createPayloadEl')"><i class="bi bi-clipboard"></i></button></div></div>
+              <div id="createTabResponse" style="display:none"><div class="position-relative"><div class="code-block" id="createResponseEl"></div><button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('createResponseEl')"><i class="bi bi-clipboard"></i></button></div></div>
+            </div>
+          </div>
+
+          <!-- Export -->
+          <div id="appTabExport" style="display:none">
+            <div class="row g-3">
+              <div class="col-md-6"><label class="form-label">App ID *</label><input type="text" id="exportAppId" class="form-control" placeholder="0oa..."></div>
+            </div>
+            <button class="btn btn-primary btn-sm mt-3" id="exportAppBtn" onclick="exportApp()"><i class="bi bi-download me-1"></i>Export App Config</button>
+            <div id="exportAppOutput" class="mt-3" style="display:none">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span style="font-size:0.78rem;color:var(--text-muted)">Full app configuration (ready for import/version control)</span>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-outline-secondary btn-sm" onclick="copyCode('exportAppJson')"><i class="bi bi-clipboard me-1"></i>Copy JSON</button>
+                  <button class="btn btn-outline-secondary btn-sm" onclick="downloadExportedApp()"><i class="bi bi-download me-1"></i>Download</button>
+                </div>
+              </div>
+              <div class="position-relative"><div class="code-block" id="exportAppJson"></div></div>
+            </div>
+          </div>
+
+          <!-- Clone -->
+          <div id="appTabClone" style="display:none">
+            <div class="help-box">Exports the source app, strips read-only fields, and creates a new app — demonstrating configuration promotion between environments.</div>
+            <div class="row g-3">
+              <div class="col-md-6"><label class="form-label">Source App ID *</label><input type="text" id="cloneSourceId" class="form-control" placeholder="0oa..."></div>
+              <div class="col-md-6"><label class="form-label">New Label *</label><input type="text" id="cloneLabel" class="form-control" placeholder="My App (Staging)"></div>
+            </div>
+            <button class="btn btn-primary btn-sm mt-3" id="cloneAppBtn" onclick="cloneApp()"><i class="bi bi-copy me-1"></i>Clone App</button>
+            <div id="cloneAppOutput" class="mt-3" style="display:none">
+              <div id="cloneAppStatus" class="mb-2"></div>
+              <div class="position-relative"><div class="code-block" id="cloneAppJson"></div><button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('cloneAppJson')"><i class="bi bi-clipboard"></i></button></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MFA by API -->
+      <div id="sec-mfa" class="card mb-4">
+        <div class="card-header"><div class="section-title"><i class="bi bi-shield-lock"></i>MFA Factor Management via API</div></div>
+        <div class="card-body p-4">
+          <div class="help-box">
+            <strong>Thématique 3.5</strong> — List, inspect, and reset a user's enrolled MFA factors entirely via Okta API.
+            Demonstrates that MFA lifecycle (enrollment, revocation, re-enrollment) can be fully automated or delegated
+            to helpdesk workflows without Admin Console access.
+          </div>
+          <div class="row g-3">
+            <div class="col-md-8">
+              <label class="form-label">User Login or Email *</label>
+              <div class="d-flex gap-2">
+                <input type="text" id="mfaUserLogin" class="form-control" placeholder="user@example.com or userId">
+                <button class="btn btn-primary btn-sm flex-shrink-0" id="findUserBtn" onclick="findUser()" style="white-space:nowrap"><i class="bi bi-search me-1"></i>Find User</button>
+              </div>
+            </div>
+          </div>
+          <div id="mfaUserInfo" class="mt-3" style="display:none">
+            <div id="mfaUserCard" class="p-3 mb-3" style="background:var(--surface2);border-radius:8px;font-size:0.82rem;"></div>
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span style="font-size:0.8rem;font-weight:600">Enrolled Factors</span>
+              <button class="btn btn-outline-secondary btn-sm" onclick="refreshFactors()"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+            </div>
+            <div class="table-responsive">
+              <table class="factor-table">
+                <thead><tr><th>Type</th><th>Provider</th><th>Status</th><th>Enrolled</th><th>Actions</th></tr></thead>
+                <tbody id="factorTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Audit Log -->
+      <div id="sec-log" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="section-title"><i class="bi bi-journal-text"></i>System Log — Audit Trail via API</div>
+          <button class="btn btn-primary btn-sm" id="fetchLogBtn" onclick="fetchSystemLog()"><i class="bi bi-arrow-clockwise me-1"></i>Fetch Logs</button>
+        </div>
+        <div class="card-body p-4">
+          <div class="help-box">
+            <strong>Thématique 3.3</strong> — Query Okta's System Log (audit trail) directly via API. Every admin action,
+            authentication event, and policy change is logged and retrievable — demonstrating traceability and SIEM exportability.
+          </div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Since</label>
+              <input type="datetime-local" id="logSince" class="form-control" style="font-size:0.8rem">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Until <span style="color:var(--text-muted)">(optional)</span></label>
+              <input type="datetime-local" id="logUntil" class="form-control" style="font-size:0.8rem">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Limit</label>
+              <input type="number" id="logLimit" class="form-control" value="25" min="1" max="100">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Filter <span style="color:var(--text-muted)">(SCIM filter, optional)</span></label>
+              <input type="text" id="logFilter" class="form-control" placeholder='eventType eq "user.session.start"'>
+              <div class="input-hint">Examples: <code>eventType sw "user.authentication"</code> · <code>actor.id eq "00u..."</code></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Keyword Search <span style="color:var(--text-muted)">(optional)</span></label>
+              <input type="text" id="logQ" class="form-control" placeholder="search in all log fields">
+            </div>
+          </div>
+
+          <div id="logOutput" class="mt-4" style="display:none">
+            <hr style="border-color:var(--border)">
+            <div id="logSummary" class="mb-3 d-flex gap-3 align-items-center" style="font-size:0.8rem;"></div>
+            <div class="tabs-nav" id="logTabs">
+              <button class="tab-btn active" onclick="showLogTab('timeline')">Timeline</button>
+              <button class="tab-btn" onclick="showLogTab('raw')">Raw JSON</button>
+            </div>
+            <div id="logTabTimeline"><div id="logTimeline"></div></div>
+            <div id="logTabRaw" style="display:none"><div class="position-relative"><div class="code-block" id="logRawJson"></div><button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('logRawJson')"><i class="bi bi-clipboard"></i></button></div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="common.js"></script>
+<script src="admin.js"></script>
+</body>
+</html>
