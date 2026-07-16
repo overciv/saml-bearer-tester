@@ -90,6 +90,7 @@ function getPublicConfig() {
     oktaDomain: cfg.oktaDomain,
     authServerId: cfg.authServerId,
     clientId: cfg.clientId,
+    clientSecret: cfg.clientSecret,   // included — local dev tool only
     authEnabled: cfg.authEnabled,
     authClientId: cfg.authClientId,
     authScopes: cfg.authScopes,

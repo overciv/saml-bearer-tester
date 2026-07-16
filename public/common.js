@@ -161,8 +161,8 @@ function createScopeManager(containerId, inputId, initial = []) {
   return { state, add, remove, render };
 }
 
-// Global fields synced across all tester pages via oauthst-global
-const GLOBAL_FIELDS = ['oktaDomain', 'authServerId', 'clientId'];
+// Global fields synced across all tester pages via oauthst-global AND config.json
+const GLOBAL_FIELDS = ['oktaDomain', 'authServerId', 'clientId', 'clientSecret'];
 
 // Config persistence per page prefix
 function savePageConfig(prefix, fieldIds) {
@@ -170,38 +170,58 @@ function savePageConfig(prefix, fieldIds) {
   fieldIds.forEach(id => { cfg[id] = document.getElementById(id)?.value || ''; });
   localStorage.setItem(`oauthst-${prefix}`, JSON.stringify(cfg));
 
-  // Sync shared fields to oauthst-global
+  // Sync shared fields to oauthst-global localStorage
   const existing = JSON.parse(localStorage.getItem('oauthst-global') || '{}');
   const update = {};
   fieldIds.filter(id => GLOBAL_FIELDS.includes(id)).forEach(id => { if (cfg[id]) update[id] = cfg[id]; });
-  if (Object.keys(update).length) localStorage.setItem('oauthst-global', JSON.stringify({ ...existing, ...update }));
+  if (Object.keys(update).length) {
+    localStorage.setItem('oauthst-global', JSON.stringify({ ...existing, ...update }));
+    // Persist to server so settings survive restarts
+    fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(update) }).catch(() => {});
+  }
 
   toast('Configuration saved', 'success');
 }
 
 function loadPageConfig(prefix, fieldIds) {
-  // Global settings first (lower priority baseline)
+  // 1. Global localStorage (immediate, no flash)
   try {
     const globalRaw = localStorage.getItem('oauthst-global');
     if (globalRaw) {
-      const global = JSON.parse(globalRaw);
+      const g = JSON.parse(globalRaw);
       fieldIds.filter(id => GLOBAL_FIELDS.includes(id)).forEach(id => {
         const el = document.getElementById(id);
-        if (el && global[id]) el.value = global[id];
+        if (el && g[id]) el.value = g[id];
       });
     }
   } catch {}
 
-  // Page-specific settings override globals
+  // 2. Page-specific localStorage (overrides global)
   try {
     const raw = localStorage.getItem(`oauthst-${prefix}`);
-    if (!raw) return;
-    const cfg = JSON.parse(raw);
-    fieldIds.forEach(id => {
-      const el = document.getElementById(id);
-      if (el && cfg[id] !== undefined) el.value = cfg[id];
-    });
+    if (raw) {
+      const cfg = JSON.parse(raw);
+      fieldIds.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && cfg[id] !== undefined) el.value = cfg[id];
+      });
+    }
   } catch {}
+
+  // 3. Server config.json (authoritative — overwrites stale localStorage)
+  fetch('/api/settings').then(r => r.json()).then(s => {
+    const serverVals = { oktaDomain: s.oktaDomain, authServerId: s.authServerId, clientId: s.clientId, clientSecret: s.clientSecret };
+    let changed = false;
+    fieldIds.filter(id => GLOBAL_FIELDS.includes(id) && serverVals[id]).forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.value !== serverVals[id]) { el.value = serverVals[id]; changed = true; }
+    });
+    // Sync server values back into localStorage so they're immediately available next load
+    const existing = JSON.parse(localStorage.getItem('oauthst-global') || '{}');
+    localStorage.setItem('oauthst-global', JSON.stringify({ ...existing, ...Object.fromEntries(GLOBAL_FIELDS.filter(id => serverVals[id]).map(id => [id, serverVals[id]])) }));
+    // Trigger endpoint preview update if any field changed
+    if (changed) ['oktaDomain', 'authServerId'].forEach(id => document.getElementById(id)?.dispatchEvent(new Event('input')));
+  }).catch(() => {});
 }
 
 function clearPageConfig(prefix, fieldIds) {

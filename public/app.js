@@ -358,44 +358,57 @@ function saveConfig() {
   cfg.attributes = collectAttributes();
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
 
-  // Sync global fields
-  const GLOBAL = ['oktaDomain', 'authServerId', 'clientId'];
+  // Sync global fields to localStorage + server
+  const GLOBAL = ['oktaDomain', 'authServerId', 'clientId', 'clientSecret'];
   const existing = JSON.parse(localStorage.getItem('oauthst-global') || '{}');
   const update = {};
   GLOBAL.forEach(id => { if (cfg[id]) update[id] = cfg[id]; });
   localStorage.setItem('oauthst-global', JSON.stringify({ ...existing, ...update }));
+  if (Object.keys(update).length)
+    fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(update) }).catch(() => {});
 
   toast('Configuration saved', 'success');
 }
 
 function loadConfig() {
-  // Global settings first (lower priority)
+  // 1. Global localStorage (immediate)
   try {
     const globalRaw = localStorage.getItem('oauthst-global');
     if (globalRaw) {
-      const global = JSON.parse(globalRaw);
-      ['oktaDomain', 'authServerId', 'clientId'].forEach(id => {
+      const g = JSON.parse(globalRaw);
+      ['oktaDomain', 'authServerId', 'clientId', 'clientSecret'].forEach(id => {
         const el = document.getElementById(id);
-        if (el && global[id]) el.value = global[id];
+        if (el && g[id]) el.value = g[id];
       });
     }
   } catch {}
 
-  // Page-specific overrides globals
+  // 2. Page-specific localStorage (overrides global)
   const raw = localStorage.getItem(CONFIG_KEY);
-  if (!raw) return;
-  try {
-    const cfg = JSON.parse(raw);
-    CONFIG_FIELDS.forEach(id => {
-      const el = document.getElementById(id);
-      if (el && cfg[id] !== undefined) el.value = cfg[id];
+  if (raw) {
+    try {
+      const cfg = JSON.parse(raw);
+      CONFIG_FIELDS.forEach(id => {
+        const el = document.getElementById(id);
+        if (el && cfg[id] !== undefined) el.value = cfg[id];
+      });
+      if (cfg.scopes?.length) { scopeList = cfg.scopes; renderScopes(); }
+      if (cfg.attributes) Object.entries(cfg.attributes).forEach(([k, v]) => addAttrRow(k, v));
+    } catch {}
+  }
+
+  // 3. Server config.json (authoritative, async)
+  fetch('/api/settings').then(r => r.json()).then(s => {
+    ['oktaDomain', 'authServerId', 'clientId', 'clientSecret'].forEach(id => {
+      if (s[id]) {
+        const el = document.getElementById(id);
+        if (el && el.value !== s[id]) el.value = s[id];
+      }
     });
-    if (cfg.scopes?.length) { scopeList = cfg.scopes; renderScopes(); }
-    if (cfg.attributes) {
-      Object.entries(cfg.attributes).forEach(([k, v]) => addAttrRow(k, v));
-    }
     updateTokenEndpointPreview();
-  } catch {}
+    const existing = JSON.parse(localStorage.getItem('oauthst-global') || '{}');
+    localStorage.setItem('oauthst-global', JSON.stringify({ ...existing, ...Object.fromEntries(['oktaDomain','authServerId','clientId','clientSecret'].filter(id => s[id]).map(id => [id, s[id]])) }));
+  }).catch(() => { updateTokenEndpointPreview(); });
 }
 
 function clearConfig() {

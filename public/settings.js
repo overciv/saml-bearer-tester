@@ -36,6 +36,7 @@ async function loadSettings() {
     if (data.oktaDomain) document.getElementById('oktaDomain').value = data.oktaDomain;
     if (data.authServerId !== undefined) document.getElementById('authServerId').value = data.authServerId;
     if (data.clientId) document.getElementById('clientId').value = data.clientId;
+    if (data.clientSecret) document.getElementById('clientSecret').value = data.clientSecret;
     if (data.authEnabled) document.getElementById('authEnabled').checked = data.authEnabled;
     if (data.authClientId) document.getElementById('authClientId').value = data.authClientId;
     if (data.redirectUri) document.getElementById('redirectUri').value = data.redirectUri;
