@@ -6,6 +6,7 @@ const CONFIG_FIELDS = ['oktaDomain', 'authServerId', 'clientId', 'clientSecret',
 const COMPARE_CLAIMS = ['cid', 'iss', 'sub', 'aud', 'scp', 'scope', 'act', 'exp', 'iat', 'jti'];
 
 let scopeMgr;
+let actorVisible = false;
 let lastSubjectDecoded = null;
 let lastResultDecoded = null;
 
@@ -36,54 +37,12 @@ function toggleAuthMethod() {
   document.getElementById('pkjwtRow').style.display = isPkjwt ? '' : 'none';
 }
 
-// Get App B's own access_token via client_credentials — used as actor_token
-async function getActorToken() {
-  const btn = document.getElementById('getActorTokenBtn');
-  setLoading(btn, true, '<i class="bi bi-play-fill me-1"></i>Getting…');
-
-  if (!val('oktaDomain') || !val('clientId')) {
-    toast('Fill in Okta Domain and App B Client ID first', 'warning');
-    setLoading(btn, false, '<i class="bi bi-play-fill me-1"></i>Get Actor Token');
-    return;
-  }
-
-  const isPkjwt = val('clientAuthMethod') === 'pkjwt';
-  let privateJwk;
-  if (isPkjwt) {
-    try { privateJwk = JSON.parse(val('clientPrivateJwk')); }
-    catch { toast('Invalid private JWK', 'error'); setLoading(btn, false, '<i class="bi bi-play-fill me-1"></i>Get Actor Token'); return; }
-  }
-
-  try {
-    const res = await fetch('/api/token-exchange/get-actor-token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        oktaDomain: val('oktaDomain'),
-        authServerId: val('authServerId'),
-        clientId: val('clientId'),
-        clientSecret: isPkjwt ? undefined : (document.getElementById('clientSecret')?.value || ''),
-        privateJwk,
-        scope: ['openid']
-      })
-    });
-    const data = await res.json();
-
-    if (data.success && data.response?.access_token) {
-      const token = data.response.access_token;
-      document.getElementById('actorToken').value = token;
-      document.getElementById('actorTokenResult').style.display = '';
-      document.getElementById('actorTokenPreview').textContent = token.substring(0, 80) + '…';
-      toast('Actor token obtained via client_credentials', 'success');
-    } else {
-      const err = data.response?.error_description || data.response?.error || data.error || `HTTP ${data.statusCode}`;
-      toast('Failed to get actor token: ' + err, 'error');
-    }
-  } catch (e) {
-    toast('Error: ' + e.message, 'error');
-  } finally {
-    setLoading(btn, false, '<i class="bi bi-play-fill me-1"></i>Get Actor Token');
-  }
+function toggleActorSection() {
+  actorVisible = !actorVisible;
+  document.getElementById('actorSection').style.display = actorVisible ? '' : 'none';
+  document.getElementById('actorToggleBtn').innerHTML = actorVisible
+    ? '<i class="bi bi-dash me-1"></i>Remove Actor Token'
+    : '<i class="bi bi-plus me-1"></i>Add Actor Token (delegation)';
 }
 
 // ─── Subject token decode preview ─────────────────────────────────────────────
@@ -128,8 +87,8 @@ async function performExchange() {
     requestedTokenType: val('requestedTokenType') || undefined,
     audience: val('audience') || undefined,
     resource: val('resource') || undefined,
-    actorToken: val('actorToken') || undefined,
-    actorTokenType: val('actorToken') ? val('actorTokenType') : undefined
+    actorToken: actorVisible ? val('actorToken') || undefined : undefined,
+    actorTokenType: actorVisible ? val('actorTokenType') || undefined : undefined
   };
 
   try {
