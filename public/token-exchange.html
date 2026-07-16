@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Token Exchange — Okta OAuth Super Tester</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
+  <style>
+    :root { --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--text:#c9d1d9;--text-muted:#8b949e;--blue:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--purple:#bc8cff;--orange:#ffa657;--teal:#2dd9c6;--coral:#f78166; }
+    body { background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,monospace; }
+    .navbar-brand { font-weight:700;font-size:1.1rem; }
+    .card { background:var(--surface);border:1px solid var(--border);border-radius:10px; }
+    .card-header { background:var(--surface2);border-bottom:1px solid var(--border);border-radius:10px 10px 0 0 !important;padding:14px 20px; }
+    .section-title { font-weight:600;font-size:0.95rem;display:flex;align-items:center;gap:8px; }
+    .section-title .bi { color:var(--coral); }
+    .form-control,.form-select { background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:0.875rem; }
+    .form-control:focus,.form-select:focus { background:var(--surface2);border-color:var(--coral);color:var(--text);box-shadow:0 0 0 3px rgba(247,129,102,0.15); }
+    .form-control::placeholder { color:var(--text-muted); }
+    .form-label { font-size:0.8rem;color:var(--text-muted);font-weight:500;margin-bottom:4px; }
+    .input-hint { font-size:0.72rem;color:var(--text-muted);margin-top:3px; }
+    .btn-primary { background:var(--coral);border-color:var(--coral);color:#0d1117;font-weight:600; }
+    .btn-primary:hover { background:#ff9d8a;border-color:#ff9d8a;color:#0d1117; }
+    .btn-outline-secondary { border-color:var(--border);color:var(--text-muted);font-size:0.8rem; }
+    .btn-outline-secondary:hover { background:var(--surface2);color:var(--text); }
+    .btn-sm { padding:4px 10px;font-size:0.775rem; }
+    .code-block { background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:'SF Mono','Fira Code',monospace;font-size:0.78rem;line-height:1.6;overflow:auto;max-height:380px;position:relative;white-space:pre-wrap;word-break:break-all; }
+    .code-block.json { color:#b5cea8; }
+    .copy-btn { position:absolute;top:8px;right:8px;z-index:10; }
+    textarea.form-control { resize:vertical; }
+    textarea.code-area { font-family:'SF Mono','Fira Code',monospace;font-size:0.78rem;min-height:80px; }
+    .scope-tags { display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;min-height:42px;cursor:text; }
+    .scope-tag { background:rgba(247,129,102,0.12);color:var(--coral);border:1px solid rgba(247,129,102,0.3);border-radius:4px;padding:2px 8px;font-size:0.78rem;display:flex;align-items:center;gap:4px; }
+    .scope-tag .rm { cursor:pointer;opacity:0.6; }
+    .scope-tag .rm:hover { opacity:1; }
+    .scope-input { border:none;background:transparent;color:var(--text);outline:none;font-size:0.8rem;min-width:120px;flex:1; }
+    .help-box { background:rgba(247,129,102,0.05);border:1px solid rgba(247,129,102,0.15);border-radius:8px;padding:12px 14px;font-size:0.8rem;color:var(--text-muted);margin-bottom:16px; }
+    .help-box strong { color:var(--coral); }
+    .help-box code { background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:0.75rem;color:var(--orange); }
+    .status-badge { font-size:0.7rem;padding:2px 7px;border-radius:10px;font-weight:700; }
+    .status-ok { background:rgba(63,185,80,0.15);color:var(--green);border:1px solid rgba(63,185,80,0.3); }
+    .status-err { background:rgba(248,81,73,0.15);color:var(--red);border:1px solid rgba(248,81,73,0.3); }
+    .spinner-border { width:1rem;height:1rem;border-width:2px; }
+    .tabs-nav { display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap; }
+    .tab-btn { padding:5px 14px;border-radius:6px;font-size:0.8rem;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all 0.15s; }
+    .tab-btn:hover { background:var(--surface2);color:var(--text); }
+    .tab-btn.active { background:rgba(247,129,102,0.1);color:var(--coral);border-color:rgba(247,129,102,0.3); }
+    .jwt-decoded { background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden; }
+    .jwt-part { padding:10px 14px;border-bottom:1px solid var(--border); }
+    .jwt-part:last-child { border-bottom:none; }
+    .jwt-part-label { font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px; }
+    .jwt-header-label { color:var(--red); }
+    .jwt-payload-label { color:var(--purple); }
+    .jwt-sig-label { color:var(--blue); }
+    .jwt-content { font-family:monospace;font-size:0.775rem;color:#b5cea8;white-space:pre-wrap; }
+    .step-link { display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--text-muted);text-decoration:none;font-size:0.875rem;transition:all 0.15s;margin-bottom:2px; }
+    .step-link:hover { background:var(--surface2);color:var(--text); }
+    .step-num { width:22px;height:22px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;flex-shrink:0; }
+
+    /* Token comparison */
+    .compare-grid { display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:start; }
+    .compare-arrow { display:flex;align-items:center;justify-content:center;padding-top:32px;color:var(--coral);font-size:1.4rem; }
+    .compare-card { background:#0d1117;border:1px solid var(--border);border-radius:8px;overflow:hidden; }
+    .compare-card-header { padding:8px 12px;font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid var(--border); }
+    .compare-card-header.subject { color:var(--blue);background:rgba(88,166,255,0.06); }
+    .compare-card-header.result  { color:var(--green);background:rgba(63,185,80,0.06); }
+    .compare-row { display:flex;justify-content:space-between;align-items:flex-start;padding:6px 12px;border-bottom:1px solid rgba(48,54,61,0.5);font-size:0.78rem;gap:8px; }
+    .compare-row:last-child { border-bottom:none; }
+    .compare-label { color:var(--text-muted);font-family:monospace;flex-shrink:0;min-width:60px; }
+    .compare-val { color:var(--text);font-family:monospace;word-break:break-all;text-align:right; }
+    .compare-val.changed { color:var(--coral);font-weight:600; }
+    .compare-val.same { color:var(--text-muted); }
+    .compare-val.added { color:var(--green); }
+
+    ::-webkit-scrollbar { width:6px;height:6px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:var(--border);border-radius:3px; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark sticky-top" style="background:var(--surface);border-bottom:1px solid var(--border);">
+  <div class="container-fluid px-4">
+    <span class="navbar-brand"><i class="bi bi-lightning-charge-fill me-2" style="color:var(--blue)"></i>Okta OAuth Super Tester</span>
+    <div class="d-flex align-items-center gap-3">
+      <div class="d-flex gap-1">
+        <a href="/" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">SAML 2.0</a>
+        <a href="/dpop.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">DPoP</a>
+        <a href="/pkjwt.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">Private Key JWT</a>
+        <a href="/ciba.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">CIBA</a>
+        <a href="/token-exchange.html" class="btn btn-sm" style="background:rgba(247,129,102,0.12);color:var(--coral);border:1px solid rgba(247,129,102,0.3);font-size:0.775rem;">Token Exchange</a>
+        <a href="/settings.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;"><i class="bi bi-gear-fill"></i></a>
+      </div>
+      <div id="navAuthArea"></div>
+      <button class="btn btn-outline-secondary btn-sm" onclick="savePageConfig('token-exchange', CONFIG_FIELDS)"><i class="bi bi-floppy me-1"></i>Save</button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="clearPageConfig('token-exchange', CONFIG_FIELDS)"><i class="bi bi-trash me-1"></i>Clear</button>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid px-4 py-4">
+  <div class="row g-4">
+    <!-- Sidebar -->
+    <div class="col-lg-2 d-none d-lg-block">
+      <div style="position:sticky;top:70px;">
+        <div class="mb-3" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;padding:0 12px;">Steps</div>
+        <a href="#step-config" class="step-link"><span class="step-num">1</span><span>App B Config</span></a>
+        <a href="#step-subject" class="step-link"><span class="step-num">2</span><span>Subject Token</span></a>
+        <a href="#step-params" class="step-link"><span class="step-num">3</span><span>Exchange Params</span></a>
+        <a href="#step-result" class="step-link"><span class="step-num">4</span><span>Result & Comparison</span></a>
+        <div style="margin:16px 12px 6px;font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;">RFC 8693 types</div>
+        <div style="padding:0 12px;font-size:0.72rem;color:var(--text-muted);line-height:2">
+          <div style="color:var(--coral)">subject_token_type</div>
+          <div>access_token</div>
+          <div>id_token</div>
+          <div>refresh_token</div>
+          <div>saml2</div>
+          <div style="color:var(--coral);margin-top:6px">requested_token_type</div>
+          <div>access_token</div>
+          <div>refresh_token</div>
+          <div>jwt</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-10">
+
+      <!-- STEP 1: App B Config -->
+      <div id="step-config" class="card mb-4">
+        <div class="card-header"><div class="section-title"><i class="bi bi-building"></i>Step 1 — App B Configuration (the requesting app)</div></div>
+        <div class="card-body p-4">
+          <div class="help-box">
+            <strong>RFC 8693 Token Exchange</strong> — App B authenticates with its own credentials and presents App A's
+            token as the <code>subject_token</code>. Okta validates App A's token, applies App B's access policies,
+            and issues a new token with App B's <code>cid</code>. The user identity (<code>sub</code>) is preserved.
+            <br><br>
+            App B must have <code>urn:ietf:params:oauth:grant-type:token-exchange</code> in its grant types.
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Okta Domain *</label>
+              <input type="text" id="oktaDomain" class="form-control" placeholder="yourorg.okta.com">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Authorization Server ID</label>
+              <input type="text" id="authServerId" class="form-control" placeholder="Leave empty for org-level server">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">App B — Client ID *</label>
+              <input type="text" id="clientId" class="form-control" placeholder="0oa... (the target app)">
+              <div class="input-hint">The token issued will have this as <code>cid</code></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">App B — Client Auth Method</label>
+              <select id="clientAuthMethod" class="form-select" onchange="toggleAuthMethod()">
+                <option value="basic">Client Secret (Basic)</option>
+                <option value="pkjwt">Private Key JWT</option>
+              </select>
+            </div>
+            <div class="col-md-6" id="secretRow">
+              <label class="form-label">App B — Client Secret *</label>
+              <input type="password" id="clientSecret" class="form-control" placeholder="Client secret">
+            </div>
+            <div class="col-12" id="pkjwtRow" style="display:none">
+              <label class="form-label">App B — Private JWK</label>
+              <textarea id="clientPrivateJwk" class="form-control code-area" rows="3" placeholder='{"kty":"RSA","alg":"RS256","d":"...","kid":"..."}'></textarea>
+            </div>
+          </div>
+          <div class="mt-3 p-3" style="background:var(--surface2);border-radius:8px;font-size:0.8rem;">
+            <span style="color:var(--text-muted)">Token endpoint: </span>
+            <span id="endpointPreview" style="color:var(--orange);font-family:monospace;font-size:0.75rem;">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2: Subject Token -->
+      <div id="step-subject" class="card mb-4">
+        <div class="card-header"><div class="section-title"><i class="bi bi-ticket-detailed"></i>Step 2 — Subject Token (App A's token)</div></div>
+        <div class="card-body p-4">
+          <div class="help-box">
+            Paste the token issued by <strong>App A</strong> (any grant flow). This is the token you are exchanging.
+            The subject's identity in this token will be preserved in the result.
+          </div>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Subject Token Type</label>
+              <select id="subjectTokenType" class="form-select">
+                <option value="urn:ietf:params:oauth:token-type:access_token">access_token (JWT)</option>
+                <option value="urn:ietf:params:oauth:token-type:id_token">id_token (JWT)</option>
+                <option value="urn:ietf:params:oauth:token-type:refresh_token">refresh_token</option>
+                <option value="urn:ietf:params:oauth:token-type:jwt">jwt (generic)</option>
+                <option value="urn:ietf:params:oauth:token-type:saml2">saml2 (Base64)</option>
+              </select>
+            </div>
+            <div class="col-12">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label mb-0">Subject Token *</label>
+                <button class="btn btn-outline-secondary btn-sm" onclick="decodeSubjectToken()">
+                  <i class="bi bi-code-slash me-1"></i>Decode
+                </button>
+              </div>
+              <textarea id="subjectToken" class="form-control code-area" rows="3" placeholder="eyJraWQ... (paste access_token or id_token from App A)"></textarea>
+              <div class="input-hint">Tip: get a token from the DPoP, PKJWT, or SAML flows above, then paste it here</div>
+            </div>
+          </div>
+          <!-- Subject token decoded preview -->
+          <div id="subjectDecoded" class="mt-3" style="display:none">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Subject token — decoded payload</div>
+            <div class="compare-card">
+              <div class="compare-card-header subject"><i class="bi bi-box-arrow-right me-1"></i>App A token (before exchange)</div>
+              <div id="subjectClaimsTable"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3: Exchange Parameters -->
+      <div id="step-params" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="section-title"><i class="bi bi-sliders"></i>Step 3 — Exchange Parameters</div>
+          <button class="btn btn-primary btn-sm" id="exchangeBtn" onclick="performExchange()">
+            <i class="bi bi-arrow-left-right me-1"></i>Exchange Token
+          </button>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Scope (for the new token)</label>
+              <div class="scope-tags" id="scopeTags" onclick="document.getElementById('scopeInput').focus()">
+                <input type="text" id="scopeInput" class="scope-input" placeholder="Add scope, press Enter...">
+              </div>
+              <div class="input-hint">Scopes App B is requesting for the resulting token</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Requested Token Type <span style="color:var(--text-muted)">(optional)</span></label>
+              <select id="requestedTokenType" class="form-select">
+                <option value="">Default (access_token)</option>
+                <option value="urn:ietf:params:oauth:token-type:access_token">access_token</option>
+                <option value="urn:ietf:params:oauth:token-type:refresh_token">refresh_token</option>
+                <option value="urn:ietf:params:oauth:token-type:jwt">jwt</option>
+              </select>
+              <div class="input-hint">Type of token to receive back</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Audience <span style="color:var(--text-muted)">(optional)</span></label>
+              <input type="text" id="audience" class="form-control" placeholder="https://api.example.com">
+              <div class="input-hint">Target service or resource the token will be used for</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Resource <span style="color:var(--text-muted)">(optional)</span></label>
+              <input type="text" id="resource" class="form-control" placeholder="https://api.example.com/data">
+              <div class="input-hint">Resource indicator (RFC 8707)</div>
+            </div>
+          </div>
+
+          <!-- Actor Token (delegation) -->
+          <div class="mt-3">
+            <button class="btn btn-outline-secondary btn-sm" onclick="toggleActorSection()" id="actorToggleBtn">
+              <i class="bi bi-plus me-1"></i>Add Actor Token (delegation)
+            </button>
+            <div id="actorSection" style="display:none" class="mt-3 p-3" style="background:var(--surface2);border-radius:8px;">
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label">Actor Token <span style="color:var(--text-muted)">(for delegation — the intermediary service)</span></label>
+                  <textarea id="actorToken" class="form-control code-area" rows="2" placeholder="eyJraWQ... (the intermediary's token)"></textarea>
+                  <div class="input-hint">Added as <code>act</code> claim in the result token, showing the delegation chain</div>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Actor Token Type</label>
+                  <select id="actorTokenType" class="form-select">
+                    <option value="urn:ietf:params:oauth:token-type:access_token">access_token</option>
+                    <option value="urn:ietf:params:oauth:token-type:jwt">jwt</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 4: Result & Comparison -->
+      <div id="step-result" class="card mb-4">
+        <div class="card-header"><div class="section-title"><i class="bi bi-arrow-left-right"></i>Step 4 — Result &amp; Token Comparison</div></div>
+        <div class="card-body p-4">
+          <div id="resultPlaceholder" class="text-center py-4" style="color:var(--text-muted)">
+            <i class="bi bi-arrow-left-right" style="font-size:2rem;opacity:0.2;display:block;margin-bottom:8px"></i>
+            Exchange a token to see the result here
+          </div>
+
+          <div id="resultContent" style="display:none">
+            <!-- Status + timing -->
+            <div id="resultStatus" class="mb-3"></div>
+
+            <!-- Token Comparison (the star feature) -->
+            <div id="comparisonSection" class="mb-4" style="display:none">
+              <div style="font-size:0.8rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:12px;">
+                <i class="bi bi-arrow-left-right me-1" style="color:var(--coral)"></i>Token Comparison
+              </div>
+              <div class="compare-grid">
+                <div class="compare-card">
+                  <div class="compare-card-header subject"><i class="bi bi-box-arrow-right me-1"></i>Subject Token — App A</div>
+                  <div id="subjectCompare"></div>
+                </div>
+                <div class="compare-arrow"><i class="bi bi-arrow-right"></i></div>
+                <div class="compare-card">
+                  <div class="compare-card-header result"><i class="bi bi-box-arrow-in-right me-1"></i>Result Token — App B</div>
+                  <div id="resultCompare"></div>
+                </div>
+              </div>
+              <div class="mt-2 d-flex gap-3" style="font-size:0.72rem;color:var(--text-muted)">
+                <span><span style="color:var(--coral);font-weight:700">●</span> Changed</span>
+                <span><span style="color:var(--green);font-weight:700">●</span> Added</span>
+                <span><span style="color:var(--text-muted)">●</span> Unchanged</span>
+              </div>
+            </div>
+
+            <!-- Full request + response tabs -->
+            <div class="tabs-nav" id="resultTabs">
+              <button class="tab-btn active" onclick="showTab('request')">Request</button>
+              <button class="tab-btn" onclick="showTab('raw')">Raw Response</button>
+              <button class="tab-btn" onclick="showTab('decoded')">Decoded Result</button>
+            </div>
+            <div id="tabRequest">
+              <div class="position-relative">
+                <div class="code-block json" id="reqDetailsEl"></div>
+                <button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('reqDetailsEl')"><i class="bi bi-clipboard"></i></button>
+              </div>
+            </div>
+            <div id="tabRaw" style="display:none">
+              <div class="position-relative">
+                <div class="code-block json" id="rawResponseEl"></div>
+                <button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('rawResponseEl')"><i class="bi bi-clipboard"></i></button>
+              </div>
+            </div>
+            <div id="tabDecoded" style="display:none">
+              <div id="decodedResultEl"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="common.js"></script>
+<script src="token-exchange.js"></script>
+</body>
+</html>

@@ -8,6 +8,7 @@ const { generateKeyPair: samlGenKeyPair, generateAssertion, decodeAssertionBase6
 const { generateDpopKeyPair, generateDpopProof, validateDpopProof } = require('./src/dpop');
 const { generatePkjwtKeyPair, generateClientAssertion, validateClientAssertion } = require('./src/pkjwt');
 const { backchannelAuthorize, pollToken } = require('./src/ciba');
+const { exchange: tokenExchange } = require('./src/token-exchange');
 const { getConfig, saveConfig, getSigningKey, generateSigningKey, getPublicJwks, getPublicConfig } = require('./src/config');
 const { requireAuth, loginHandler, callbackHandler, logoutHandler, meHandler } = require('./src/auth');
 
@@ -199,6 +200,15 @@ app.post('/api/pkjwt/introspect', async (req, res) => {
 
 // ─── CIBA routes ──────────────────────────────────────────────────────────────
 
+// ─── Token Exchange routes (RFC 8693) ────────────────────────────────────────
+
+app.post('/api/token-exchange/exchange', async (req, res) => {
+  try { res.json(await tokenExchange(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── CIBA routes ──────────────────────────────────────────────────────────────
+
 app.post('/api/ciba/backchannel-authorize', async (req, res) => {
   try { res.json(await backchannelAuthorize(req.body)); }
   catch (e) { res.status(500).json({ error: e.message }); }
@@ -235,6 +245,7 @@ app.post('/api/introspect', async (req, res) => {
     console.log(`   DPoP        →  http://localhost:${PORT}/dpop.html`);
     console.log(`   Priv Key JWT → http://localhost:${PORT}/pkjwt.html`);
   console.log(`   CIBA         → http://localhost:${PORT}/ciba.html`);
+  console.log(`   Token Exch   → http://localhost:${PORT}/token-exchange.html`);
     console.log(`   Settings    →  http://localhost:${PORT}/settings.html\n`);
   });
 })();
