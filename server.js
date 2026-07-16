@@ -207,6 +207,30 @@ app.post('/api/token-exchange/exchange', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// Get App B's own token (client_credentials) to use as actor_token
+app.post('/api/token-exchange/get-actor-token', async (req, res) => {
+  const { oktaDomain, authServerId, clientId, clientSecret, privateJwk, scope } = req.body;
+  const ep = tokenEp(oktaDomain, authServerId);
+  const scopes = Array.isArray(scope) ? scope.join(' ') : (scope || 'openid');
+  const params = new URLSearchParams({ grant_type: 'client_credentials', scope: scopes });
+  const headers = { 'Content-Type': 'application/x-www-form-urlencoded' };
+  if (privateJwk) {
+    try {
+      const { assertion } = await generateClientAssertion({ privateJwk, clientId, audience: ep, validitySeconds: 300 });
+      params.set('client_assertion_type', 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer');
+      params.set('client_assertion', assertion);
+      params.set('client_id', clientId);
+    } catch (e) { return res.status(400).json({ error: e.message }); }
+  } else {
+    headers['Authorization'] = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
+  }
+  const t0 = Date.now();
+  try {
+    const r = await axios.post(ep, params.toString(), { headers, validateStatus: () => true });
+    res.json({ success: r.status < 300 && !r.data?.error, statusCode: r.status, durationMs: Date.now()-t0, response: r.data });
+  } catch (e) { res.json({ success: false, statusCode: 0, error: e.message }); }
+});
+
 // ─── CIBA routes ──────────────────────────────────────────────────────────────
 
 app.post('/api/ciba/backchannel-authorize', async (req, res) => {
