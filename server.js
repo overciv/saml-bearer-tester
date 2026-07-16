@@ -7,6 +7,7 @@ const path = require('path');
 const { generateKeyPair: samlGenKeyPair, generateAssertion, decodeAssertionBase64 } = require('./src/saml');
 const { generateDpopKeyPair, generateDpopProof, validateDpopProof } = require('./src/dpop');
 const { generatePkjwtKeyPair, generateClientAssertion, validateClientAssertion } = require('./src/pkjwt');
+const { backchannelAuthorize, pollToken } = require('./src/ciba');
 const { getConfig, saveConfig, getSigningKey, generateSigningKey, getPublicJwks, getPublicConfig } = require('./src/config');
 const { requireAuth, loginHandler, callbackHandler, logoutHandler, meHandler } = require('./src/auth');
 
@@ -196,6 +197,18 @@ app.post('/api/pkjwt/introspect', async (req, res) => {
   }
 });
 
+// ─── CIBA routes ──────────────────────────────────────────────────────────────
+
+app.post('/api/ciba/backchannel-authorize', async (req, res) => {
+  try { res.json(await backchannelAuthorize(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/ciba/poll', async (req, res) => {
+  try { res.json(await pollToken(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
 app.post('/api/introspect', async (req, res) => {
   const { oktaDomain, authServerId, clientId, clientSecret, token, tokenTypeHint } = req.body;
   const ep = introspectEp(oktaDomain, authServerId);
@@ -221,6 +234,7 @@ app.post('/api/introspect', async (req, res) => {
     console.log(`   SAML        →  http://localhost:${PORT}/`);
     console.log(`   DPoP        →  http://localhost:${PORT}/dpop.html`);
     console.log(`   Priv Key JWT → http://localhost:${PORT}/pkjwt.html`);
+  console.log(`   CIBA         → http://localhost:${PORT}/ciba.html`);
     console.log(`   Settings    →  http://localhost:${PORT}/settings.html\n`);
   });
 })();

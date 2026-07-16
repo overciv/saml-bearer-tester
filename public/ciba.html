@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CIBA — Okta OAuth Super Tester</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
+  <style>
+    :root { --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--text:#c9d1d9;--text-muted:#8b949e;--blue:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--purple:#bc8cff;--orange:#ffa657;--teal:#2dd9c6; }
+    body { background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,monospace; }
+    .navbar-brand { font-weight:700;font-size:1.1rem; }
+    .card { background:var(--surface);border:1px solid var(--border);border-radius:10px; }
+    .card-header { background:var(--surface2);border-bottom:1px solid var(--border);border-radius:10px 10px 0 0 !important;padding:14px 20px; }
+    .section-title { font-weight:600;font-size:0.95rem;display:flex;align-items:center;gap:8px; }
+    .section-title .bi { color:var(--teal); }
+    .form-control,.form-select { background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:0.875rem; }
+    .form-control:focus,.form-select:focus { background:var(--surface2);border-color:var(--teal);color:var(--text);box-shadow:0 0 0 3px rgba(45,217,198,0.15); }
+    .form-control::placeholder { color:var(--text-muted); }
+    .form-label { font-size:0.8rem;color:var(--text-muted);font-weight:500;margin-bottom:4px; }
+    .input-hint { font-size:0.72rem;color:var(--text-muted);margin-top:3px; }
+    .btn-primary { background:var(--teal);border-color:var(--teal);color:#0d1117;font-weight:600; }
+    .btn-primary:hover { background:#5ee8d9;border-color:#5ee8d9;color:#0d1117; }
+    .btn-outline-secondary { border-color:var(--border);color:var(--text-muted);font-size:0.8rem; }
+    .btn-outline-secondary:hover { background:var(--surface2);color:var(--text); }
+    .btn-sm { padding:4px 10px;font-size:0.775rem; }
+    .code-block { background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:'SF Mono','Fira Code',monospace;font-size:0.78rem;line-height:1.6;overflow:auto;max-height:360px;position:relative;white-space:pre-wrap;word-break:break-all; }
+    .code-block.json { color:#b5cea8; }
+    .copy-btn { position:absolute;top:8px;right:8px;z-index:10; }
+    textarea.form-control { resize:vertical; }
+    textarea.code-area { font-family:'SF Mono','Fira Code',monospace;font-size:0.78rem;min-height:80px; }
+    .scope-tags { display:flex;flex-wrap:wrap;gap:6px;padding:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;min-height:42px;cursor:text; }
+    .scope-tag { background:rgba(45,217,198,0.12);color:var(--teal);border:1px solid rgba(45,217,198,0.25);border-radius:4px;padding:2px 8px;font-size:0.78rem;display:flex;align-items:center;gap:4px; }
+    .scope-tag .rm { cursor:pointer;opacity:0.6; }
+    .scope-tag .rm:hover { opacity:1; }
+    .scope-input { border:none;background:transparent;color:var(--text);outline:none;font-size:0.8rem;min-width:120px;flex:1; }
+    .help-box { background:rgba(45,217,198,0.04);border:1px solid rgba(45,217,198,0.15);border-radius:8px;padding:12px 14px;font-size:0.8rem;color:var(--text-muted);margin-bottom:16px; }
+    .help-box strong { color:var(--teal); }
+    .help-box code { background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:0.75rem;color:var(--orange); }
+    .warn-box { background:rgba(210,153,34,0.05);border:1px solid rgba(210,153,34,0.25);border-radius:8px;padding:12px 14px;font-size:0.8rem;color:var(--text-muted); }
+    .warn-box strong { color:var(--yellow); }
+    .warn-box code { background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:0.75rem;color:var(--orange); }
+    .status-badge { font-size:0.7rem;padding:2px 7px;border-radius:10px;font-weight:700; }
+    .status-ok { background:rgba(63,185,80,0.15);color:var(--green);border:1px solid rgba(63,185,80,0.3); }
+    .status-err { background:rgba(248,81,73,0.15);color:var(--red);border:1px solid rgba(248,81,73,0.3); }
+    .status-wait { background:rgba(45,217,198,0.12);color:var(--teal);border:1px solid rgba(45,217,198,0.25); }
+    .spinner-border { width:1rem;height:1rem;border-width:2px; }
+    .tabs-nav { display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap; }
+    .tab-btn { padding:5px 14px;border-radius:6px;font-size:0.8rem;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all 0.15s; }
+    .tab-btn:hover { background:var(--surface2);color:var(--text); }
+    .tab-btn.active { background:rgba(45,217,198,0.1);color:var(--teal);border-color:rgba(45,217,198,0.3); }
+    .jwt-decoded { background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden; }
+    .jwt-part { padding:10px 14px;border-bottom:1px solid var(--border); }
+    .jwt-part:last-child { border-bottom:none; }
+    .jwt-part-label { font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px; }
+    .jwt-header-label { color:var(--red); }
+    .jwt-payload-label { color:var(--purple); }
+    .jwt-sig-label { color:var(--blue); }
+    .jwt-content { font-family:monospace;font-size:0.775rem;color:#b5cea8;white-space:pre-wrap; }
+
+    /* CIBA-specific */
+    .step-link { display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--text-muted);text-decoration:none;font-size:0.875rem;transition:all 0.15s;margin-bottom:2px; }
+    .step-link:hover { background:var(--surface2);color:var(--text); }
+    .step-num { width:22px;height:22px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;flex-shrink:0; }
+
+    /* Polling status card */
+    .poll-status-card { border-radius:12px;padding:24px;text-align:center;transition:background 0.4s,border-color 0.4s; }
+    .poll-status-card.waiting { background:rgba(45,217,198,0.05);border:2px solid rgba(45,217,198,0.2); }
+    .poll-status-card.approved { background:rgba(63,185,80,0.07);border:2px solid rgba(63,185,80,0.3); }
+    .poll-status-card.denied { background:rgba(248,81,73,0.06);border:2px solid rgba(248,81,73,0.25); }
+    .poll-status-card.expired { background:rgba(139,148,158,0.06);border:2px solid rgba(139,148,158,0.2); }
+    .poll-status-icon { font-size:2.2rem;margin-bottom:10px;display:block; }
+    .poll-status-title { font-size:1.1rem;font-weight:700;margin-bottom:4px; }
+    .poll-meta { font-size:0.78rem;color:var(--text-muted); }
+
+    /* Binding message */
+    .binding-box { background:var(--surface2);border:1px dashed var(--teal);border-radius:10px;padding:16px 20px;text-align:center;margin:16px 0; }
+    .binding-box-label { font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--teal);font-weight:600;margin-bottom:6px; }
+    .binding-box-message { font-size:1rem;font-weight:600;color:var(--text); }
+
+    /* Expiry progress */
+    .expiry-bar-wrap { height:5px;background:var(--surface2);border-radius:3px;overflow:hidden;margin:10px 0; }
+    .expiry-bar { height:100%;background:var(--teal);transition:width 1s linear;border-radius:3px; }
+
+    /* Poll timeline */
+    .poll-timeline { display:flex;flex-direction:column;gap:6px; }
+    .poll-entry { border:1px solid var(--border);border-radius:7px;overflow:hidden; }
+    .poll-entry-header { padding:8px 12px;display:flex;align-items:center;gap:8px;cursor:pointer;background:var(--surface2);font-size:0.8rem; }
+    .poll-entry-header:hover { background:rgba(255,255,255,0.03); }
+    .poll-entry-body { padding:10px 12px;border-top:1px solid var(--border);display:none; }
+    .poll-entry-body.open { display:block; }
+    .poll-dot { width:8px;height:8px;border-radius:50%;flex-shrink:0; }
+    .dot-pending { background:var(--text-muted); }
+    .dot-success { background:var(--green); }
+    .dot-denied { background:var(--red); }
+    .dot-slowdown { background:var(--yellow); }
+    .dot-expired { background:var(--text-muted); }
+
+    ::-webkit-scrollbar { width:6px;height:6px; }
+    ::-webkit-scrollbar-track { background:transparent; }
+    ::-webkit-scrollbar-thumb { background:var(--border);border-radius:3px; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark sticky-top" style="background:var(--surface);border-bottom:1px solid var(--border);">
+  <div class="container-fluid px-4">
+    <span class="navbar-brand"><i class="bi bi-lightning-charge-fill me-2" style="color:var(--blue)"></i>Okta OAuth Super Tester</span>
+    <div class="d-flex align-items-center gap-3">
+      <div class="d-flex gap-1">
+        <a href="/" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">SAML 2.0</a>
+        <a href="/dpop.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">DPoP</a>
+        <a href="/pkjwt.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;">Private Key JWT</a>
+        <a href="/ciba.html" class="btn btn-sm" style="background:rgba(45,217,198,0.12);color:var(--teal);border:1px solid rgba(45,217,198,0.3);font-size:0.775rem;">CIBA</a>
+        <a href="/settings.html" class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.775rem;"><i class="bi bi-gear-fill"></i></a>
+      </div>
+      <div id="navAuthArea"></div>
+      <button class="btn btn-outline-secondary btn-sm" onclick="savePageConfig('ciba', CONFIG_FIELDS)"><i class="bi bi-floppy me-1"></i>Save</button>
+      <button class="btn btn-outline-secondary btn-sm" onclick="clearPageConfig('ciba', CONFIG_FIELDS)"><i class="bi bi-trash me-1"></i>Clear</button>
+    </div>
+  </div>
+</nav>
+
+<div class="container-fluid px-4 py-4">
+  <div class="row g-4">
+    <!-- Sidebar -->
+    <div class="col-lg-2 d-none d-lg-block">
+      <div style="position:sticky;top:70px;">
+        <div class="mb-3" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;padding:0 12px;">Steps</div>
+        <a href="#step-config" class="step-link"><span class="step-num">1</span><span>Okta Config</span></a>
+        <a href="#step-authorize" class="step-link"><span class="step-num">2</span><span>Backchannel Auth</span></a>
+        <a href="#step-poll" class="step-link"><span class="step-num">3</span><span>Token Polling</span></a>
+        <a href="#step-setup" class="step-link"><span class="step-num"><i class="bi bi-info-circle" style="font-size:0.65rem"></i></span><span>Setup Guide</span></a>
+      </div>
+    </div>
+
+    <div class="col-lg-10">
+
+      <!-- STEP 1: Config -->
+      <div id="step-config" class="card mb-4">
+        <div class="card-header"><div class="section-title"><i class="bi bi-building"></i>Step 1 — Okta Configuration</div></div>
+        <div class="card-body p-4">
+          <div class="help-box">
+            <strong>CIBA requires a Web Application</strong> with the
+            <code>urn:openid:params:grant-type:ciba</code> grant type enabled and a
+            <strong>Custom Authenticator</strong> configured for push notifications.
+            See the Setup Guide below for full instructions.
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Okta Domain *</label>
+              <input type="text" id="oktaDomain" class="form-control" placeholder="yourorg.okta.com">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Authorization Server ID</label>
+              <input type="text" id="authServerId" class="form-control" placeholder="Leave empty for org-level server">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Client ID *</label>
+              <input type="text" id="clientId" class="form-control" placeholder="0oa...">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Client Auth Method</label>
+              <select id="clientAuthMethod" class="form-select" onchange="toggleAuthMethod()">
+                <option value="basic">Client Secret (Basic auth)</option>
+                <option value="pkjwt">Private Key JWT</option>
+              </select>
+            </div>
+            <div class="col-12" id="secretRow">
+              <label class="form-label">Client Secret *</label>
+              <input type="password" id="clientSecret" class="form-control" placeholder="Client secret for Basic auth">
+            </div>
+            <div class="col-12" id="pkjwtRow" style="display:none">
+              <label class="form-label">Private JWK (for client assertion)</label>
+              <textarea id="clientPrivateJwk" class="form-control code-area" rows="4" placeholder='{"kty":"RSA","alg":"RS256","d":"...","kid":"..."}'></textarea>
+              <div class="input-hint">The same key registered in Okta app (Apps → app → Client Credentials → Public keys)</div>
+            </div>
+          </div>
+          <div class="mt-3 p-3" style="background:var(--surface2);border-radius:8px;font-size:0.8rem;">
+            <span style="color:var(--text-muted)">bc/authorize endpoint: </span>
+            <span id="bcEndpointPreview" style="color:var(--orange);font-family:monospace;font-size:0.75rem;">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 2: Backchannel Authorization -->
+      <div id="step-authorize" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="section-title"><i class="bi bi-phone-vibrate"></i>Step 2 — Backchannel Authorization Request</div>
+          <button class="btn btn-primary btn-sm" id="sendAuthBtn" onclick="sendBackchannelRequest()">
+            <i class="bi bi-send-fill me-1"></i>Send Request
+          </button>
+        </div>
+        <div class="card-body p-4">
+          <div class="help-box">
+            The consumption device (this app) POSTs to Okta's <code>bc/authorize</code> endpoint.
+            Okta pushes a notification to the user's <strong>Custom Authenticator</strong> app.
+            The user taps Approve on their device — no browser redirect required.
+          </div>
+          <div class="row g-3">
+            <div class="col-12">
+              <label class="form-label">Scopes *</label>
+              <div class="scope-tags" id="scopeTags" onclick="document.getElementById('scopeInput').focus()">
+                <input type="text" id="scopeInput" class="scope-input" placeholder="Add scope, press Enter...">
+              </div>
+              <div class="input-hint">Must include <code>openid</code>. Common: <code>openid</code> <code>email</code> <code>profile</code></div>
+            </div>
+
+            <div class="col-12">
+              <div class="d-flex gap-2 align-items-center mb-2">
+                <label class="form-label mb-0">User Identifier *</label>
+                <div class="btn-group btn-group-sm ms-2" role="group">
+                  <button type="button" class="btn btn-outline-secondary active" id="hintLoginBtn" onclick="setHintMode('login')">login_hint</button>
+                  <button type="button" class="btn btn-outline-secondary" id="hintIdTokenBtn" onclick="setHintMode('idtoken')">id_token_hint</button>
+                </div>
+              </div>
+              <div id="loginHintRow">
+                <input type="email" id="loginHint" class="form-control" placeholder="user@example.com">
+                <div class="input-hint">User's email address — Okta uses this to route the push notification</div>
+              </div>
+              <div id="idTokenHintRow" style="display:none">
+                <textarea id="idTokenHint" class="form-control code-area" rows="2" placeholder="eyJraWQ... (paste id_token from a previous session)"></textarea>
+                <div class="input-hint">Previously issued ID token — use when the user is already logged in on this device</div>
+              </div>
+            </div>
+
+            <div class="col-md-8">
+              <label class="form-label">Binding Message <span style="color:var(--text-muted)">(optional)</span></label>
+              <input type="text" id="bindingMessage" class="form-control" placeholder="Sign in to OAuth Super Tester">
+              <div class="input-hint">Short human-readable text shown on both devices to prevent replay attacks</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Request Expiry <span style="color:var(--text-muted)">(seconds)</span></label>
+              <input type="number" id="requestExpiry" class="form-control" value="300" min="10" max="3600">
+              <div class="input-hint">Validity of the <code>auth_req_id</code></div>
+            </div>
+          </div>
+
+          <!-- Output -->
+          <div id="authorizeOutput" class="mt-4" style="display:none">
+            <hr style="border-color:var(--border)">
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Request Details</div>
+            <div class="code-block json mb-3" id="authorizeReqDetails"></div>
+            <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:6px;">Response</div>
+            <div class="position-relative">
+              <div class="code-block json" id="authorizeResponse"></div>
+              <button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('authorizeResponse')"><i class="bi bi-clipboard"></i></button>
+            </div>
+            <button class="btn btn-outline-secondary btn-sm mt-2" onclick="scrollToPolling()">
+              <i class="bi bi-arrow-down-circle me-1"></i>Proceed to Token Polling
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- STEP 3: Token Polling -->
+      <div id="step-poll" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="section-title"><i class="bi bi-arrow-repeat"></i>Step 3 — Token Polling</div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-primary btn-sm" id="startPollBtn" onclick="startPolling()">
+              <i class="bi bi-play-fill me-1"></i>Start Polling
+            </button>
+            <button class="btn btn-outline-secondary btn-sm" id="stopPollBtn" onclick="stopPolling()" disabled>
+              <i class="bi bi-stop-fill me-1"></i>Stop
+            </button>
+          </div>
+        </div>
+        <div class="card-body p-4">
+          <div class="help-box">
+            Poll Okta's <code>/token</code> endpoint with <code>grant_type=urn:openid:params:grant-type:ciba</code>
+            every <strong id="pollIntervalDisplay">5</strong>s (from the <code>interval</code> field in the authorize response).
+            Keep polling while Okta returns <code>authorization_pending</code>. Stop on <code>slow_down</code>
+            (increases interval by 5s), <code>access_denied</code>, <code>expired_token</code>, or success.
+          </div>
+
+          <div class="row g-3 mb-4">
+            <div class="col-12">
+              <label class="form-label">auth_req_id (auto-filled)</label>
+              <input type="text" id="authReqId" class="form-control" placeholder="Auto-filled from Step 2" style="font-family:monospace;font-size:0.78rem;">
+            </div>
+          </div>
+
+          <!-- Status display (hidden until polling starts) -->
+          <div id="pollStatusArea" style="display:none">
+
+            <!-- Status card -->
+            <div class="poll-status-card waiting mb-3" id="pollStatusCard">
+              <span class="poll-status-icon" id="pollStatusIcon">⏳</span>
+              <div class="poll-status-title" id="pollStatusTitle">Waiting for user approval</div>
+              <div class="poll-meta mt-1">
+                Poll attempt <span id="pollAttemptCount">0</span>
+                &nbsp;·&nbsp; <span id="pollIntervalLabel">5s</span> interval
+                &nbsp;·&nbsp; <span id="timeRemainingLabel">—</span> remaining
+              </div>
+            </div>
+
+            <!-- Binding message (if set) -->
+            <div id="bindingBoxDisplay" class="binding-box" style="display:none">
+              <div class="binding-box-label"><i class="bi bi-phone-vibrate me-1"></i>Look for this on the user's device</div>
+              <div class="binding-box-message" id="bindingBoxMsg"></div>
+            </div>
+
+            <!-- Expiry progress bar -->
+            <div class="expiry-bar-wrap">
+              <div class="expiry-bar" id="expiryBar" style="width:100%"></div>
+            </div>
+
+            <!-- Poll timeline -->
+            <div class="mt-3">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span style="font-size:0.78rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Poll Attempts</span>
+                <button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('pollTimeline').innerHTML=''">Clear</button>
+              </div>
+              <div id="pollTimeline" class="poll-timeline" style="max-height:280px;overflow-y:auto"></div>
+            </div>
+
+            <!-- Token result -->
+            <div id="tokenResultArea" class="mt-4" style="display:none">
+              <hr style="border-color:var(--border)">
+              <div class="tabs-nav" id="tokenTabs">
+                <button class="tab-btn active" onclick="showTTab('raw')">Raw Response</button>
+                <button class="tab-btn" onclick="showTTab('access')">Access Token</button>
+                <button class="tab-btn" onclick="showTTab('id')">ID Token</button>
+              </div>
+              <div id="tTabRaw"><div class="position-relative"><div class="code-block json" id="rawTokenResponse"></div><button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('rawTokenResponse')"><i class="bi bi-clipboard"></i></button></div></div>
+              <div id="tTabAccess" style="display:none"><div id="accessTokenDecoded"></div></div>
+              <div id="tTabId" style="display:none"><div id="idTokenDecoded"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Setup Guide -->
+      <div id="step-setup" class="card mb-4">
+        <div class="card-header"><div class="section-title"><i class="bi bi-book"></i>Okta Setup Guide</div></div>
+        <div class="card-body p-4">
+          <div class="warn-box mb-4">
+            <strong>⚠️ CIBA requires a Custom Authenticator</strong> — a branded mobile app built with the Okta Devices SDK.
+            There is no way to test CIBA without an enrolled Custom Authenticator that receives push notifications.
+          </div>
+
+          <div class="row g-4">
+            <div class="col-md-6">
+              <div style="font-size:0.85rem;font-weight:600;margin-bottom:10px;color:var(--teal)">1. Configure the Okta App</div>
+              <ol style="font-size:0.82rem;color:var(--text-muted);padding-left:1.3rem;line-height:2">
+                <li>Apps → your app → <strong>General → Grant types</strong></li>
+                <li>Enable <code>urn:openid:params:grant-type:ciba</code></li>
+                <li>Set <strong>Preferred authenticator for CIBA</strong> → your Custom Authenticator</li>
+                <li>Optionally set <code>backchannel_token_delivery_mode = poll</code> (only supported mode)</li>
+              </ol>
+
+              <div style="font-size:0.85rem;font-weight:600;margin:16px 0 10px;color:var(--teal)">2. Enable in Auth Server Policy</div>
+              <ol style="font-size:0.82rem;color:var(--text-muted);padding-left:1.3rem;line-height:2">
+                <li>Security → API → your auth server → <strong>Access Policies</strong></li>
+                <li>Edit the default policy rule → Grant types → Advanced</li>
+                <li>Enable <strong>Client-initiated backchannel authentication (CIBA)</strong></li>
+              </ol>
+            </div>
+
+            <div class="col-md-6">
+              <div style="font-size:0.85rem;font-weight:600;margin-bottom:10px;color:var(--teal)">3. Custom Authenticator Enrollment</div>
+              <ol style="font-size:0.82rem;color:var(--text-muted);padding-left:1.3rem;line-height:2">
+                <li>Build a mobile app using the <a href="https://github.com/okta/okta-devices-swift" style="color:var(--teal)">Okta Devices SDK</a> (Swift / Kotlin)</li>
+                <li>Enroll the user's device via <code>enrollAuthenticator()</code></li>
+                <li>Enable "Sign in with push notifications" in the authenticator app</li>
+                <li>Enable <strong>CIBA transactions</strong> in the push notification settings</li>
+              </ol>
+
+              <div style="font-size:0.85rem;font-weight:600;margin:16px 0 10px;color:var(--teal)">CIBA Grant Type</div>
+              <div class="code-block" style="max-height:none;color:var(--orange)">urn:openid:params:grant-type:ciba</div>
+
+              <div style="font-size:0.85rem;font-weight:600;margin:16px 0 10px;color:var(--teal)">Error Codes</div>
+              <table style="font-size:0.78rem;color:var(--text-muted);width:100%;border-collapse:collapse">
+                <tr><td style="padding:3px 0;color:var(--orange)">authorization_pending</td><td style="padding-left:10px">Keep polling (user hasn't approved yet)</td></tr>
+                <tr><td style="padding:3px 0;color:var(--orange)">slow_down</td><td style="padding-left:10px">Polling too fast — increase interval by 5s</td></tr>
+                <tr><td style="padding:3px 0;color:var(--orange)">expired_token</td><td style="padding-left:10px">auth_req_id has expired — restart the flow</td></tr>
+                <tr><td style="padding:3px 0;color:var(--orange)">access_denied</td><td style="padding-left:10px">User denied the push notification</td></tr>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="common.js"></script>
+<script src="ciba.js"></script>
+</body>
+</html>
