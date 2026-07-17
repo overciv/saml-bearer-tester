@@ -240,10 +240,15 @@
               </div>
             </div>
 
-            <!-- Step 2: Generate + Preview -->
-            <button class="btn btn-outline-secondary btn-sm mt-3" id="generatePayloadBtn" onclick="generateAppPayload()">
-              <i class="bi bi-code-slash me-1"></i>Generate Request Payload
-            </button>
+            <!-- Step 2: Generate + Download -->
+            <div class="d-flex gap-2 mt-3 flex-wrap">
+              <button class="btn btn-outline-secondary btn-sm" id="generatePayloadBtn" onclick="generateAppPayload()">
+                <i class="bi bi-code-slash me-1"></i>Generate Request Payload
+              </button>
+              <button class="btn btn-outline-secondary btn-sm" onclick="downloadTerraform()" style="color:var(--purple);border-color:var(--purple)">
+                <i class="bi bi-download me-1"></i>Download Terraform <code style="font-size:0.68rem">.tf</code>
+              </button>
+            </div>
 
             <div id="payloadPreviewSection" class="mt-3" style="display:none">
               <div class="d-flex justify-content-between align-items-center mb-2">
