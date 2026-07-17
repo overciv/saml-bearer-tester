@@ -8,9 +8,16 @@ const STEP_DEFS = {
     bg:'rgba(88,166,255,0.12)',
     inputs:[], outputs:['access_token','id_token','refresh_token'],
     configFields:[
-      {k:'clientId',  label:'Client ID',     type:'text', ph:'0oa...'},
-      {k:'scope',     label:'Scope',         type:'text', ph:'openid profile email'},
-      {k:'redirectUri',label:'Redirect URI', type:'text', def:'http://localhost:3000/oauth/callback'},
+      {k:'clientId',        label:'Client ID',         type:'text',     ph:'0oa...'},
+      {k:'scope',           label:'Scope',             type:'text',     ph:'openid profile email'},
+      {k:'redirectUri',     label:'Redirect URI',      type:'text',     def:'http://localhost:3000/oauth/callback'},
+      {k:'clientAuthMethod',label:'Client Auth',       type:'select',   options:[
+        {value:'none',  label:'None (public client)'},
+        {value:'basic', label:'Client Secret (Basic)'},
+        {value:'pkjwt', label:'Private Key JWT'},
+      ]},
+      {k:'clientSecret',    label:'Client Secret',     type:'password', ph:'(if Basic auth)'},
+      {k:'privateJwk',      label:'Private JWK (JSON)', type:'textarea', ph:'{"kty":"RSA",...} (if PKJWT)'},
     ]
   },
   'client-creds': {
@@ -329,19 +336,38 @@ function renderStepCard(step, idx) {
 
   // Config form
   const configRows = (def.configFields || []).map(f => {
-    const v = step.config[f.k] || '';
-    return `<div class="step-config-row"><div style="flex:1">
-      <div class="form-label">${escHtml(f.label)}</div>
-      <input type="${f.type||'text'}" class="form-control form-control-sm" value="${escHtml(v)}" placeholder="${escHtml(f.ph||'')}"
-        oninput="setConfig('${step.id}','${f.k}',this.value)">
-    </div></div>`;
+    const v = step.config[f.k] || f.def || '';
+    let input;
+    if (f.type === 'select' && f.options) {
+      const opts = f.options.map(o => `<option value="${escHtml(o.value)}" ${v===o.value?'selected':''}>${escHtml(o.label)}</option>`).join('');
+      input = `<select class="form-control form-control-sm" onchange="setConfig('${step.id}','${f.k}',this.value)">${opts}</select>`;
+    } else if (f.type === 'textarea') {
+      input = `<textarea class="form-control form-control-sm" rows="2" placeholder="${escHtml(f.ph||'')}" style="font-family:monospace;font-size:0.72rem;resize:vertical"
+        oninput="setConfig('${step.id}','${f.k}',this.value)">${escHtml(v)}</textarea>`;
+    } else {
+      input = `<input type="${f.type||'text'}" class="form-control form-control-sm" value="${escHtml(v)}" placeholder="${escHtml(f.ph||'')}"
+        oninput="setConfig('${step.id}','${f.k}',this.value)">`;
+    }
+    return `<div class="step-config-row"><div style="flex:1"><div class="form-label">${escHtml(f.label)}</div>${input}</div></div>`;
   }).join('');
 
   // Result display
   let resultHtml = '';
   if (step.result) {
     if (step.result.error) {
-      resultHtml = `<div class="step-result" style="color:var(--red);font-size:0.78rem">✗ ${escHtml(step.result.error)}</div>`;
+      resultHtml = `<div class="step-result">
+        <div style="color:var(--red);font-size:0.78rem;margin-bottom:6px">✗ ${escHtml(step.result.error)}</div>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm" style="color:var(--yellow);border:1px solid var(--yellow);background:rgba(210,153,34,0.08);font-size:0.72rem"
+            onclick="retryFromStep('${step.id}')">
+            <i class="bi bi-arrow-clockwise me-1"></i>Retry from here
+          </button>
+          <button class="btn btn-sm" style="color:var(--text-muted);border:1px solid var(--border);font-size:0.72rem"
+            onclick="skipStepAndContinue('${step.id}')">
+            <i class="bi bi-skip-forward me-1"></i>Skip &amp; continue
+          </button>
+        </div>
+      </div>`;
     } else if (step.result.outputs && Object.keys(step.result.outputs).length) {
       const rows = Object.entries(step.result.outputs)
         .filter(([,v]) => v)
@@ -410,28 +436,52 @@ function setConfig(stepId, key, value) {
 
 // ─── Execution ────────────────────────────────────────────────────────────────
 
-async function runChain() {
+let _chainRunning  = false;
+let _chainAborted  = false;
+let _chainStartIdx = 0; // index to resume/retry from
+
+async function runChain(fromIdx = 0) {
+  if (_chainRunning) { toast('Chain is already running', 'warning'); return; }
   if (!chain.length) { toast('Add some steps first', 'warning'); return; }
-  const btn = document.getElementById('runBtn');
-  setLoading(btn, true, '<i class="bi bi-play-fill me-1"></i>Running…');
-  outputStore = {};
+
+  _chainRunning = true;
+  _chainAborted = false;
+  _chainStartIdx = fromIdx;
+
+  const runBtn  = document.getElementById('runBtn');
+  const stopBtn = document.getElementById('stopBtn');
+  setLoading(runBtn, true, '<i class="bi bi-play-fill me-1"></i>Running…');
+  if (stopBtn) stopBtn.style.display = '';
 
   document.getElementById('runLog').style.display = '';
-  document.getElementById('runLogEntries').innerHTML = '';
-
-  // Reset all statuses
-  chain.forEach(s => { s.status = 'idle'; s.result = null; });
+  if (fromIdx === 0) {
+    document.getElementById('runLogEntries').innerHTML = '';
+    outputStore = {};
+    chain.forEach(s => { s.status = 'idle'; s.result = null; });
+  } else {
+    // Partial restart: reset from fromIdx onward, keep earlier outputs
+    chain.slice(fromIdx).forEach(s => { s.status = 'idle'; s.result = null; });
+  }
   renderPipeline();
 
   const g = G();
   const domain = g.oktaDomain || '';
-  const sid = g.authServerId || '';
+  const sid    = g.authServerId || '';
 
-  for (const step of chain) {
+  document.getElementById('chainStatus').textContent = `Running… (${chain.length} step${chain.length>1?'s':''})`;
+
+  for (let i = fromIdx; i < chain.length; i++) {
+    if (_chainAborted) {
+      chain[i].status = 'idle';
+      document.getElementById('chainStatus').textContent = `⏹ Stopped at step ${i+1}`;
+      break;
+    }
+
+    const step = chain[i];
     step.status = 'running';
-    renderStepCard_update(step);
+    renderPipeline();
 
-    // Resolve inputs
+    // Resolve inputs from outputStore
     const inputs = {};
     for (const [iname, binding] of Object.entries(step.bindings || {})) {
       const key = `${binding.stepId}.${binding.outputName}`;
@@ -439,28 +489,80 @@ async function runChain() {
     }
 
     const t0 = Date.now();
+    let result;
     try {
-      const result = await executeStep(step, inputs, domain, sid);
-      step.result = result;
-      step.status = result.success ? 'success' : 'error';
-
-      if (result.outputs) {
-        Object.entries(result.outputs).forEach(([k, v]) => { if (v) outputStore[`${step.id}.${k}`] = v; });
-      }
-
-      addLog(chain.indexOf(step)+1, STEP_DEFS[step.type]?.label || step.type, result.success, Date.now()-t0, result.error);
+      result = await executeStep(step, inputs, domain, sid);
     } catch (e) {
-      step.result = { success: false, error: e.message, outputs: {} };
-      step.status = 'error';
-      addLog(chain.indexOf(step)+1, STEP_DEFS[step.type]?.label || step.type, false, Date.now()-t0, e.message);
-      break; // stop chain on error
+      result = { success: false, error: e.message, outputs: {} };
     }
 
+    step.result = result;
+    step.status = result.success ? 'success' : 'error';
+
+    if (result.outputs) {
+      Object.entries(result.outputs).forEach(([k, v]) => { if (v) outputStore[`${step.id}.${k}`] = v; });
+    }
+
+    addLog(i+1, STEP_DEFS[step.type]?.label || step.type, result.success, Date.now()-t0, result.error);
     renderPipeline();
-    await new Promise(r => setTimeout(r, 50)); // small UI refresh pause
+    await new Promise(r => setTimeout(r, 50));
+
+    if (!result.success && !_chainAborted) {
+      // Chain paused on failure — show recovery options
+      const label = STEP_DEFS[step.type]?.label || step.type;
+      document.getElementById('chainStatus').textContent = `⚠️ Paused at step ${i+1} (${label})`;
+      toast(`Chain paused — step ${i+1} failed. Fix the config then retry.`, 'error');
+      break;
+    }
   }
 
-  setLoading(btn, false, '<i class="bi bi-play-fill me-1"></i>Run Chain');
+  const allDone = chain.every(s => s.status === 'success');
+  if (allDone) document.getElementById('chainStatus').textContent = `✅ All ${chain.length} steps completed`;
+
+  _chainRunning = false;
+  setLoading(runBtn, false, '<i class="bi bi-play-fill me-1"></i>Run Chain');
+  if (stopBtn) stopBtn.style.display = 'none';
+}
+
+function stopChain() {
+  _chainAborted = true;
+  toast('Chain aborted', 'info');
+}
+
+function restartChain() {
+  if (_chainRunning) { toast('Stop the chain first', 'warning'); return; }
+  outputStore = {};
+  chain.forEach(s => { s.status = 'idle'; s.result = null; });
+  renderPipeline();
+  document.getElementById('runLogEntries').innerHTML = '';
+  document.getElementById('chainStatus').textContent = '';
+  toast('Chain reset — ready to run', 'info');
+}
+
+function retryFromStep(stepId) {
+  if (_chainRunning) { toast('Stop the chain first', 'warning'); return; }
+  const idx = chain.findIndex(s => s.id === stepId);
+  if (idx < 0) return;
+  // Clear results from this step onward
+  chain.slice(idx).forEach(s => { s.status = 'idle'; s.result = null; });
+  chain.slice(idx).forEach(s => {
+    const def = STEP_DEFS[s.type];
+    (def?.outputs || []).forEach(out => delete outputStore[`${s.id}.${out}`]);
+  });
+  renderPipeline();
+  toast(`Retrying from step ${idx+1}…`, 'info');
+  runChain(idx);
+}
+
+function skipStepAndContinue(stepId) {
+  if (_chainRunning) { toast('Stop the chain first', 'warning'); return; }
+  const idx = chain.findIndex(s => s.id === stepId);
+  if (idx < 0) return;
+  chain[idx].status = 'idle';
+  chain[idx].result = null;
+  renderPipeline();
+  toast(`Skipping step ${idx+1}, continuing from step ${idx+2}…`, 'warning');
+  runChain(idx + 1);
 }
 
 function renderStepCard_update(step) {
@@ -647,10 +749,22 @@ async function execAuthCode(step, domain, sid) {
   const c = step.config;
   const redirectUri = c.redirectUri || 'http://localhost:3000/oauth/callback';
 
+  const authMethod = c.clientAuthMethod || 'none';
+  let privateJwk;
+  if (authMethod === 'pkjwt' && c.privateJwk) {
+    try { privateJwk = JSON.parse(c.privateJwk); } catch { /* ignore — will fail at backend */ }
+  }
+
   const startRes = await fetch('/api/oauth/start', {
     method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ oktaDomain:domain, authServerId:sid, clientId:c.clientId,
-      redirectUri, scope:(c.scope||'openid profile email').split(/\s+/) })
+    body: JSON.stringify({
+      oktaDomain:domain, authServerId:sid, clientId:c.clientId,
+      redirectUri, scope:(c.scope||'openid profile email').split(/\s+/),
+      clientAuthMethod: authMethod,
+      clientSecret: authMethod === 'basic' ? (c.clientSecret || '') : undefined,
+      privateJwk:   authMethod === 'pkjwt' ? privateJwk : undefined,
+      ...(c.acrValues ? { acrValues: c.acrValues } : {}),
+    })
   }).then(r=>r.json());
 
   const { flowId, authUrl } = startRes;

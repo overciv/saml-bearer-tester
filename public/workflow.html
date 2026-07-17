@@ -98,6 +98,12 @@
     <button class="btn btn-sm" style="background:var(--blue);color:#0d1117;font-weight:600;border:none" id="runBtn" onclick="runChain()">
       <i class="bi bi-play-fill me-1"></i>Run Chain
     </button>
+    <button class="btn btn-sm" style="background:var(--red);color:white;border:none;display:none" id="stopBtn" onclick="stopChain()" title="Stop the chain after the current step">
+      <i class="bi bi-stop-fill me-1"></i>Stop
+    </button>
+    <button class="btn btn-sm btn-outline-secondary" onclick="restartChain()" title="Clear all results and reset chain to idle">
+      <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+    </button>
     <div id="navAuthArea"></div>
   </div>
 </div>
