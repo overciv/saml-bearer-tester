@@ -224,7 +224,7 @@ app.get('/oauth/callback', async (req, res) => {
 <div style="font-weight:600">${isOk ? 'Authentication successful' : 'Authentication failed'}</div>
 <div style="font-size:0.82rem;color:#8b949e">${isOk ? 'You can close this window' : escHtmlServer(error || 'Unknown error')}</div>
 <script>
-  const payload = ${JSON.stringify({ type:'oauth-callback', flowId, status:'${status}', tokens: isOk ? tokens : null, error: isOk ? null : (error||'failed') })};
+  const payload = ${JSON.stringify({ type:'oauth-callback', flowId, status, tokens: isOk ? tokens : null, error: isOk ? null : (error||null), durationMs: statusResult?.durationMs || null })};
   if (window.opener) { try { window.opener.postMessage(payload, '*'); } catch(e){} }
   if (${isOk}) setTimeout(() => { try { window.close(); } catch(e){} }, 1200);
 </script></body></html>`);

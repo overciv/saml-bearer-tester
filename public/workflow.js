@@ -52,11 +52,22 @@ const STEP_DEFS = {
   'dpop-token': {
     label:'DPoP Token', icon:'bi-fingerprint', color:'var(--blue)',
     bg:'rgba(88,166,255,0.08)',
-    inputs:[], outputs:['access_token'],
+    inputs:[], outputs:['access_token','refresh_token'],
     configFields:[
-      {k:'clientId',    label:'Client ID',     type:'text'},
-      {k:'clientSecret',label:'Client Secret', type:'password'},
-      {k:'scope',       label:'Scope',         type:'text', ph:'openid'},
+      {k:'clientId',    label:'Client ID',         type:'text'},
+      {k:'clientSecret',label:'Client Secret',     type:'password'},
+      {k:'scope',       label:'Scope',             type:'text',   ph:'openid'},
+      {k:'grantType',   label:'Grant Type',        type:'select', options:[
+        {value:'client_credentials', label:'client_credentials'},
+        {value:'refresh_token',      label:'refresh_token'},
+      ]},
+      {k:'refreshToken',label:'Refresh Token',     type:'text',   ph:'(required when grant = refresh_token)'},
+      {k:'dpopAlg',     label:'DPoP Key Algorithm',type:'select', options:[
+        {value:'ES256', label:'ES256 — EC P-256 (recommended)'},
+        {value:'ES384', label:'ES384 — EC P-384'},
+        {value:'RS256', label:'RS256 — RSA 2048'},
+        {value:'PS256', label:'PS256 — RSA-PSS 2048'},
+      ]},
     ]
   },
   'ropc': {
@@ -991,15 +1002,26 @@ async function executeStep(step, inputs, domain, sid) {
     }
 
     case 'dpop-token': {
-      const kp = await fetch('/api/dpop/generate-keypair',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({alg:'ES256'})}).then(r=>r.json());
+      const alg       = c.dpopAlg || 'ES256';
+      const grantType = c.grantType || 'client_credentials';
+      const kp = await fetch('/api/dpop/generate-keypair', {
+        method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({alg})
+      }).then(r=>r.json());
       const r = await fetch('/api/dpop/exchange-token', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId, clientSecret:c.clientSecret,
-          scope:(c.scope||'openid').split(/\s+/), grantType:'client_credentials', privateJwk:kp.privateJwk, publicJwk:kp.publicJwk })
+        body: JSON.stringify({
+          oktaDomain:stepDomain, authServerId:stepSid,
+          clientId:c.clientId, clientSecret:c.clientSecret,
+          scope:(c.scope||'openid').split(/\s+/),
+          grantType,
+          refreshToken: grantType === 'refresh_token' ? c.refreshToken : undefined,
+          privateJwk:kp.privateJwk, publicJwk:kp.publicJwk
+        })
       }).then(r=>r.json());
       const at = r.response?.access_token;
       const ms = r.steps?.filter(s=>s.type==='request').reduce((t,s)=>t+(s.durationMs||0),0);
-      return { success:r.success, outputs:{ access_token:at },
+      return { success:r.success,
+        outputs:{ access_token:at, refresh_token:r.response?.refresh_token },
         durationMs:ms, summary:_tokenSummary(at),
         error:!r.success?(r.response?.error||`HTTP ${r.statusCode}`):null };
     }
