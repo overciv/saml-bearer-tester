@@ -296,7 +296,8 @@
                 <span style="font-size:0.78rem;color:var(--text-muted)">Full app configuration (ready for import/version control)</span>
                 <div class="d-flex gap-2">
                   <button class="btn btn-outline-secondary btn-sm" onclick="copyCode('exportAppJson')"><i class="bi bi-clipboard me-1"></i>Copy JSON</button>
-                  <button class="btn btn-outline-secondary btn-sm" onclick="downloadExportedApp()"><i class="bi bi-download me-1"></i>Download</button>
+                  <button class="btn btn-outline-secondary btn-sm" onclick="downloadExportedApp()"><i class="bi bi-download me-1"></i>Download JSON</button>
+                  <button class="btn btn-outline-secondary btn-sm" onclick="downloadTerraformFromExport()" style="color:var(--purple);border-color:var(--purple)"><i class="bi bi-download me-1"></i>Download <code style="font-size:0.68rem">.tf</code></button>
                 </div>
               </div>
               <div class="position-relative"><div class="code-block" id="exportAppJson"></div></div>

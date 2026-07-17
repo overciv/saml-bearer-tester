@@ -521,6 +521,177 @@ function downloadExportedApp() {
   a.click();
 }
 
+function downloadTerraformFromExport() {
+  if (!exportedAppData) { toast('Export an app first', 'warning'); return; }
+
+  const app      = exportedAppData;
+  const resName  = _tfName(app.label || 'app');
+  const domain   = val('adminDomain') || 'yourorg.okta.com';
+  const { orgName, baseUrl } = _parseDomain(domain);
+  const isOidc   = app.signOnMode === 'OPENID_CONNECT';
+  const isSaml   = app.signOnMode === 'SAML_2_0';
+  const proto    = isOidc ? 'oidc' : 'saml';
+  const now      = new Date().toISOString().slice(0, 10);
+
+  if (!isOidc && !isSaml) {
+    toast(`Unsupported signOnMode: ${app.signOnMode}`, 'error');
+    return;
+  }
+
+  const header = `# ─────────────────────────────────────────────────────────────────────────────
+# Exported from Okta OAuth Super Tester
+# Source app  : ${app.id}
+# Label       : ${app.label}
+# Protocol    : ${isOidc ? 'OIDC (OpenID Connect) — okta_app_oauth' : 'SAML 2.0 — okta_app_saml'}
+# Source org  : ${domain}
+# Exported    : ${now}
+# Reference   : https://registry.terraform.io/providers/okta/okta/latest/docs
+# ─────────────────────────────────────────────────────────────────────────────
+
+terraform {
+  required_providers {
+    okta = {
+      source  = "okta/okta"
+      version = "~> 4.0"
+    }
+  }
+}
+
+# Credentials via environment variables (recommended):
+#   export OKTA_ORG_NAME="${orgName}"
+#   export OKTA_BASE_URL="${baseUrl}"
+#   export OKTA_API_TOKEN="00YXSE_..."
+
+variable "okta_api_token" {
+  type        = string
+  sensitive   = true
+  description = "Okta SSWS API token"
+}
+
+provider "okta" {
+  org_name  = "${orgName}"
+  base_url  = "${baseUrl}"
+  api_token = var.okta_api_token
+}
+
+`;
+
+  const appBlock = isOidc ? _buildOidcTfFromExport(resName, app) : _buildSamlTfFromExport(resName, app);
+  const outputs  = _buildOutputsTf(resName, proto);
+  const tf       = header + appBlock + outputs;
+
+  const blob = new Blob([tf], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${resName}.tf`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast(`Downloaded ${resName}.tf`, 'success');
+}
+
+function _buildOidcTfFromExport(resName, app) {
+  const oc          = app.settings?.oauthClient || {};
+  const creds       = app.credentials?.oauthClient || {};
+  const grantTypes  = oc.grant_types  || [];
+  const respTypes   = oc.response_types || ['code'];
+  const redirects   = oc.redirect_uris || [];
+  const postLogout  = oc.post_logout_redirect_uris || [];
+  const authMethod  = creds.token_endpoint_auth_method || 'client_secret_basic';
+  const appType     = oc.application_type || 'web';
+  const dpop        = oc.dpop_bound_access_tokens === true;
+  const consent     = oc.consent_method;
+
+  const lines = [
+    `  label  = "${_tfEsc(app.label)}"`,
+    `  type   = "${appType}"`,
+    `  status = "${app.status || 'ACTIVE'}"`,
+    '',
+    `  grant_types               = ${_tfList(grantTypes)}`,
+    `  response_types            = ${_tfList(respTypes)}`,
+    `  token_endpoint_auth_method = "${authMethod}"`,
+  ];
+  if (redirects.length)  lines.push(`  redirect_uris             = ${_tfList(redirects)}`);
+  if (postLogout.length) lines.push(`  post_logout_redirect_uris = ${_tfList(postLogout)}`);
+  if (dpop)              lines.push(`  dpop_bound_access_tokens  = true`);
+  if (consent && consent !== 'REQUIRED') lines.push(`  consent_method            = "${consent}"`);
+
+  return `# ─── OIDC Application ────────────────────────────────────────────────────────
+# Docs: https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_oauth
+resource "okta_app_oauth" "${resName}" {
+${lines.join('\n')}
+}
+
+`;
+}
+
+function _buildSamlTfFromExport(resName, app) {
+  const s = app.settings?.signOn || {};
+  // Resolve fields — Okta sometimes stores them under override names
+  const ssoUrl      = s.ssoAcsUrl     || s.ssoAcsUrlOverride  || '';
+  const recipient   = s.recipient     || s.recipientOverride   || ssoUrl;
+  const destination = s.destination   || ssoUrl;
+  const audience    = s.audience      || s.audienceOverride    || '';
+  const nameIdTpl   = s.subjectNameIdTemplate || '${user.userName}';
+  const nameIdFmt   = s.subjectNameIdFormat   || 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress';
+  const sigAlg      = s.signatureAlgorithm    || 'RSA_SHA256';
+  const digAlg      = s.digestAlgorithm       || 'SHA256';
+  const relayState  = s.defaultRelayState;
+
+  const attrBlocks = (s.attributeStatements || [])
+    .filter(a => a.name)
+    .map(a => {
+      if (a.type === 'GROUP') {
+        return `
+  attribute_statements {
+    name         = "${_tfEsc(a.name)}"
+    namespace    = "${a.namespace || 'urn:oasis:names:tc:SAML:2.0:attrname-format:basic'}"
+    type         = "GROUP"
+    filter_type  = "${a.filterType || 'STARTS_WITH'}"
+    filter_value = "${_tfEsc(a.filterValue || '')}"
+  }`;
+      }
+      return `
+  attribute_statements {
+    name      = "${_tfEsc(a.name)}"
+    namespace = "${a.namespace || 'urn:oasis:names:tc:SAML:2.0:attrname-format:basic'}"
+    type      = "EXPRESSION"
+    values    = ${_tfList(a.values || [])}
+  }`;
+    }).join('');
+
+  const lines = [
+    `  label  = "${_tfEsc(app.label)}"`,
+    `  status = "${app.status || 'ACTIVE'}"`,
+    '',
+    `  # Service Provider endpoints`,
+    `  sso_url     = "${_tfEsc(ssoUrl)}"`,
+    `  recipient   = "${_tfEsc(recipient)}"`,
+    `  destination = "${_tfEsc(destination)}"`,
+    `  audience    = "${_tfEsc(audience)}"`,
+    '',
+    `  # Subject / NameID`,
+    '  # Okta expressions use ${...} — escaped to $${...} in HCL',
+    `  subject_name_id_template = "${_tfEsc(nameIdTpl)}"`,
+    `  subject_name_id_format   = "${nameIdFmt}"`,
+    '',
+    `  # Signing`,
+    `  signature_algorithm  = "${sigAlg}"`,
+    `  digest_algorithm     = "${digAlg}"`,
+    `  response_signed      = ${s.responseSigned !== false}`,
+    `  assertion_signed     = ${s.assertionSigned !== false}`,
+    `  honor_force_authn    = ${s.honorForceAuthn !== false}`,
+  ];
+  if (relayState) lines.push(`  default_relay_state  = "${_tfEsc(relayState)}"`);
+
+  return `# ─── SAML 2.0 Application ────────────────────────────────────────────────────
+# Docs: https://registry.terraform.io/providers/okta/okta/latest/docs/resources/app_saml
+resource "okta_app_saml" "${resName}" {
+${lines.join('\n')}
+${attrBlocks}
+}
+
+`;}
+
 async function cloneApp() {
   const btn = document.getElementById('cloneAppBtn');
   setLoading(btn, true, '<i class="bi bi-copy me-1"></i>Cloning…');
