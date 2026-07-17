@@ -727,6 +727,7 @@ function _tokenSummary(token) {
 function _renderStepResult(step) {
   const r = step.result;
   if (!r) return '';
+  const _btn = `<div style="margin-top:5px"><button class="btn btn-outline-secondary btn-sm" style="font-size:0.68rem" onclick="showStepResult('${step.id}')"><i class="bi bi-eye me-1"></i>View full result</button></div>`;
 
   // Timing badge (shown for all steps that have it)
   const timing = r.durationMs != null
@@ -736,6 +737,7 @@ function _renderStepResult(step) {
   // ── token-inspect: show decoded claims ─────────────────────────────────────
   if (step.type === 'token-inspect' && r.decoded) {
     const p = r.decoded.payload;
+    /* compact preview below; full RFC table is in the modal */
     const exp  = p.exp ? new Date(p.exp * 1000) : null;
     const ok   = exp && exp > new Date();
     const keys = ['sub','cid','uid','acr','amr','scp'];
@@ -755,7 +757,7 @@ function _renderStepResult(step) {
     return `<div class="step-result">
       ${timing}<span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">${typeLabel}${dpop}</span>
       ${rows}${expRow}
-    </div>`;
+    </div>${_btn}`;
   }
 
   // ── token-revoke: show revocation verdict ──────────────────────────────────
@@ -763,7 +765,7 @@ function _renderStepResult(step) {
     const icon = r.revoked ? '✓' : '⚠';
     const color = r.revoked ? 'var(--green)' : 'var(--yellow)';
     const msg   = r.revoked ? 'Revoked — active: false (confirmed)' : 'Revoke sent (introspect still pending)';
-    return `<div class="step-result">${timing}<span style="color:${color};font-size:0.78rem">${icon} ${msg}</span></div>`;
+    return `<div class="step-result">${timing}<span style="color:${color};font-size:0.78rem">${icon} ${msg}</span></div>${_btn}`;
   }
 
   // ── mfa-list-factors: factor list ─────────────────────────────────────────
@@ -771,7 +773,7 @@ function _renderStepResult(step) {
     return `<div class="step-result">${timing}
       <div style="font-size:0.78rem;color:var(--green)">✓ ${r.factorCount ?? '?'} factor${r.factorCount!==1?'s':''} found</div>
       ${r.summary ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">${escHtml(r.summary)}</div>` : ''}
-    </div>`;
+    </div>${_btn}`;
   }
 
   // ── token summary for all token-producing steps ────────────────────────────
@@ -789,7 +791,7 @@ function _renderStepResult(step) {
       <span class="result-key">${k}</span>
       <span class="result-val" style="${k==='exp'&&s._expired?'color:var(--red)':k==='exp'?'color:var(--green)':''}">${escHtml(v.slice(0,80)+(v.length>80?'…':''))}</span>
     </div>`).join('');
-    return `<div class="step-result">${timing}${typeLine}${rows}</div>`;
+    return `<div class="step-result">${timing}${typeLine}${rows}</div>${_btn}`;
   }
 
   // ── Named outputs (fallback) ───────────────────────────────────────────────
@@ -800,11 +802,117 @@ function _renderStepResult(step) {
         <span class="result-val" onclick="showTokenPopup('${escHtml(String(v))}')">${escHtml(String(v).slice(0,60)+(String(v).length>60?'…':''))}</span>
         <button class="btn btn-outline-secondary btn-sm" onclick="copyRaw('${escHtml(String(v))}')" title="Copy"><i class="bi bi-clipboard"></i></button>
       </div>`).join('');
-    return `<div class="step-result">${timing}${rows}</div>`;
+    return `<div class="step-result">${timing}${rows}</div>${_btn}`;
   }
 
   // ── Bare success ───────────────────────────────────────────────────────────
-  return `<div class="step-result">${timing}<span style="color:var(--green);font-size:0.78rem">✓ Completed</span></div>`;
+  return `<div class="step-result">${timing}<span style="color:var(--green);font-size:0.78rem">✓ Completed</span></div>${_btn}`;
+}
+
+// Appends the "View full result" button to any successful step card result area
+function _viewBtn(stepId) {
+  return `<div style="margin-top:6px">
+    <button class="btn btn-outline-secondary btn-sm" style="font-size:0.7rem" onclick="showStepResult('${stepId}')">
+      <i class="bi bi-eye me-1"></i>View full result
+    </button>
+  </div>`;
+}
+
+// ─── Step Result Modal ────────────────────────────────────────────────────────
+// Shows IDENTICAL content to the standalone test page inside a modal overlay.
+
+let _stepModalKeyHandler = null;
+
+function showStepResult(stepId) {
+  const step = chain.find(s => s.id === stepId);
+  if (!step?.result) return;
+  const def = STEP_DEFS[step.type];
+  const r   = step.result;
+  const idx = chain.indexOf(step);
+
+  // Title
+  document.getElementById('stepResultTitle').innerHTML =
+    `<span style="width:22px;height:22px;border-radius:5px;background:${def.bg};color:${def.color};display:inline-flex;align-items:center;justify-content:center;font-size:0.78rem;margin-right:8px;flex-shrink:0"><i class="bi ${def.icon}"></i></span>
+     Step ${idx+1} — ${escHtml(def.label)}
+     ${r.durationMs!=null?`<span style="background:rgba(45,217,198,0.1);color:#2dd9c6;border:1px solid rgba(45,217,198,0.25);border-radius:10px;padding:1px 8px;font-size:0.68rem;font-weight:700;font-family:monospace;margin-left:8px">⏱ ${r.durationMs}ms</span>`:''}`;
+
+  let html = '';
+
+  // ── token-inspect: exact same RFC table as the standalone page ──────────────
+  if (step.type === 'token-inspect' && r.decoded) {
+    html = renderTokenBadges(r.decoded) + renderClaimsTable(r.decoded.payload);
+  }
+
+  // ── token-revoke: show the two-step timeline ────────────────────────────────
+  else if (step.type === 'token-revoke') {
+    const verdict = r.revoked
+      ? `<div style="color:var(--green);font-size:0.85rem;font-weight:600;margin-bottom:12px">✓ Token successfully revoked — active: false confirmed via introspect</div>`
+      : `<div style="color:var(--yellow);font-size:0.85rem;font-weight:600;margin-bottom:12px">⚠ Revoke sent — introspect verification pending</div>`;
+    html = verdict + (r.steps||[]).map((s,i) => {
+      const ok = s.success !== false;
+      return `<details${i===((r.steps||[]).length-1)?' open':''} style="margin-bottom:6px">
+        <summary style="cursor:pointer;padding:7px 10px;background:var(--surface2);border-radius:7px;font-size:0.8rem;list-style:none;display:flex;align-items:center;gap:8px">
+          <span style="width:8px;height:8px;border-radius:50%;background:${ok?'var(--green)':'var(--red)'};flex-shrink:0"></span>
+          <span style="font-weight:600">${escHtml(s.label)}</span>
+          ${s.statusCode?`<span style="color:var(--text-muted);font-size:0.72rem;margin-left:auto">HTTP ${s.statusCode} · ${s.durationMs}ms</span>`:''}
+          ${s.note?`<span style="font-size:0.7rem;color:var(--text-muted)">— ${escHtml(s.note)}</span>`:''}
+        </summary>
+        <div class="code-block json" style="margin:4px 0 0;max-height:200px">${escHtml(JSON.stringify(s.response||s.body||s.error||{},null,2))}</div>
+      </details>`;
+    }).join('');
+  }
+
+  // ── all token-producing steps: full JWT decode (same as standalone pages) ───
+  else {
+    const tokens = [
+      r.outputs?.access_token  && ['access_token',  r.outputs.access_token],
+      r.outputs?.id_token       && ['id_token',       r.outputs.id_token],
+      r.outputs?.refresh_token  && ['refresh_token',  r.outputs.refresh_token],
+    ].filter(Boolean);
+
+    if (tokens.length) {
+      // Tab strip when multiple tokens
+      const tabId = 'rt_' + stepId;
+      if (tokens.length > 1) {
+        const tabs = tokens.map(([name],i) =>
+          `<button class="tab-btn${i===0?' active':''}" onclick="document.querySelectorAll('.${tabId}').forEach((el,j)=>{el.style.display=j===${i}?'':'none';el.previousElementSibling?.classList.toggle('active',j===${i})});this.closest('.tabs-nav').querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active')">${escHtml(name)}</button>`
+        ).join('');
+        const panels = tokens.map(([name, token],i) =>
+          `<button style="display:none"></button><div class="${tabId}" style="${i!==0?'display:none':''}">${renderJwtDecoded(token, name)}</div>`
+        ).join('');
+        html = `<div class="tabs-nav">${tabs}</div>${panels}`;
+        // Fix: first tab panel always visible
+        html = `<div class="tabs-nav">${tabs}</div>` + tokens.map(([name,token],i) =>
+          `<div class="${tabId}" style="${i!==0?'display:none':''}">${renderJwtDecoded(token,name)}</div>`
+        ).join('');
+      } else {
+        html = renderJwtDecoded(tokens[0][1], tokens[0][0]);
+      }
+    } else {
+      html = `<div style="color:var(--text-muted);font-size:0.82rem">No token data available</div>`;
+    }
+  }
+
+  // Error details
+  if (r.error) {
+    html += `<div class="code-block" style="color:var(--red);margin-top:12px">${escHtml(r.error)}</div>`;
+  }
+
+  document.getElementById('stepResultContent').innerHTML = html;
+
+  // Wire up tab buttons if any
+  const firstTab = document.querySelector(`#stepResultContent .tabs-nav .tab-btn`);
+  if (firstTab) firstTab.click();
+
+  document.getElementById('stepResultModal').style.display = 'flex';
+
+  _stepModalKeyHandler = (e) => { if (e.key === 'Escape') closeStepModal(); };
+  document.addEventListener('keydown', _stepModalKeyHandler);
+}
+
+function closeStepModal() {
+  document.getElementById('stepResultModal').style.display = 'none';
+  if (_stepModalKeyHandler) { document.removeEventListener('keydown', _stepModalKeyHandler); _stepModalKeyHandler = null; }
 }
 
 async function executeStep(step, inputs, domain, sid) {

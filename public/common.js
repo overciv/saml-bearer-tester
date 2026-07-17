@@ -250,6 +250,120 @@ async function initNavAuth() {
   } catch { /* server not yet ready — ignore */ }
 }
 
+// ─── Full RFC Token Inspector (shared between token-inspector page AND workflow modal) ─
+
+const CLAIM_META = {
+  sub:  { std:'RFC 7519', type:'native',       desc:'Subject — principal identified by this token. User email/login for user tokens, client_id for M2M tokens.' },
+  iss:  { std:'RFC 7519', type:'native',       desc:'Issuer — the authorization server that issued the token.' },
+  aud:  { std:'RFC 7519', type:'native',       desc:'Audience — intended recipient(s). Must be validated by the resource server.' },
+  exp:  { std:'RFC 7519', type:'configurable', desc:'Expiration time. Configurable via auth server access policy (default 1 hour).' },
+  iat:  { std:'RFC 7519', type:'native',       desc:'Issued at (Unix timestamp).' },
+  nbf:  { std:'RFC 7519', type:'native',       desc:'Not before — token must not be accepted before this time.' },
+  jti:  { std:'RFC 7519', type:'native',       desc:'JWT ID — unique identifier for replay protection.' },
+  azp:  { std:'OIDC Core', type:'native',      desc:'Authorized party — client_id of the party to which the token was issued.' },
+  nonce:{ std:'OIDC Core', type:'native',      desc:'Nonce — binds id_token to the session; prevents replay attacks.' },
+  auth_time:{ std:'OIDC Core', type:'native',  desc:'Authentication time — when the user last authenticated.' },
+  acr:  { std:'OIDC Core', type:'native',      desc:'Authentication Context Class Reference — Level of Assurance.' },
+  amr:  { std:'RFC 8176',  type:'native',      desc:'Authentication Methods References — pwd, mfa, otp, hwk, swk…' },
+  at_hash:  { std:'OIDC Core', type:'native',  desc:'Access token hash — binds id_token to access_token.' },
+  c_hash:   { std:'OIDC Core', type:'native',  desc:'Code hash — prevents code substitution attacks.' },
+  name: { std:'OIDC Core', type:'mappable',    desc:'Full name. Profile scope + attribute mapping required.' },
+  given_name: { std:'OIDC Core', type:'mappable', desc:'Given name. Profile scope required.' },
+  family_name:{ std:'OIDC Core', type:'mappable', desc:'Family name. Profile scope required.' },
+  email:{ std:'OIDC Core', type:'mappable',    desc:'Email address. Email scope required.' },
+  email_verified:{ std:'OIDC Core', type:'mappable', desc:'Whether email is verified.' },
+  preferred_username:{ std:'OIDC Core', type:'native', desc:'Login username.' },
+  phone_number:{ std:'OIDC Core', type:'mappable', desc:'Phone number. Phone scope required.' },
+  locale:   { std:'OIDC Core', type:'mappable', desc:'User locale (BCP 47).' },
+  ver:  { std:'Okta', type:'native',           desc:'Token schema version.' },
+  cid:  { std:'Okta', type:'native',           desc:'Client ID of the application that requested the token.' },
+  uid:  { std:'Okta', type:'native',           desc:'Okta User ID. Present in user tokens; absent in M2M tokens.' },
+  scp:  { std:'OAuth 2.0', type:'configurable',desc:'Scopes granted. Standard scopes are native; custom scopes are configurable.' },
+  groups:{ std:'Okta (custom)', type:'mappable',desc:'Group memberships. Must be explicitly configured via custom claims.' },
+  cnf:  { std:'RFC 9449', type:'native',       desc:'Confirmation — contains the DPoP key thumbprint (jkt) binding the token to a key pair.' },
+  act:  { std:'RFC 8693', type:'native',       desc:'Actor — identifies the party acting on behalf of the subject (delegation chain).' },
+};
+
+const TYPE_HTML = {
+  native:       '<span class="type-native">● native</span>',
+  configurable: '<span class="type-configurable">◐ configurable</span>',
+  mappable:     '<span class="type-mappable">○ mappable</span>',
+  custom:       '<span class="type-custom">✦ custom</span>',
+};
+
+function formatClaimValue(key, val) {
+  if (val === undefined || val === null) return '<span style="opacity:0.4">—</span>';
+  if (['exp','iat','nbf','auth_time'].includes(key) && typeof val === 'number') {
+    const d = new Date(val * 1000);
+    const expired = key === 'exp' && d < new Date();
+    return `<span style="color:var(--orange,#ffa657)">${val}</span> <span style="color:var(--text-muted,#8b949e);font-size:0.7rem">(${d.toISOString().replace('T',' ').slice(0,19)})</span>`;
+  }
+  if (key === 'amr' && Array.isArray(val)) {
+    const labels = { pwd:'password', mfa:'multi-factor', otp:'one-time-password', hwk:'hardware key', swk:'software key', pop:'proof-of-possession', sms:'SMS' };
+    return val.map(v => `<span style="background:rgba(227,179,65,0.1);color:var(--amber,#e3b341);border-radius:3px;padding:1px 5px;font-size:0.72rem;margin-right:2px">${escHtml(v)}${labels[v]?` <span style="opacity:0.6;font-size:0.65rem">${escHtml(labels[v])}</span>`:''}</span>`).join('');
+  }
+  if (key === 'cnf' && typeof val === 'object') return `<span style="color:var(--teal,#2dd9c6)">jkt: ${escHtml(val.jkt || JSON.stringify(val))}</span>`;
+  if (key === 'act' && typeof val === 'object') return `<span style="color:var(--orange,#ffa657)">sub: ${escHtml(val.sub || JSON.stringify(val))}</span>`;
+  if (Array.isArray(val)) return val.map(v => `<span style="background:var(--surface2,#21262d);border-radius:3px;padding:1px 5px;margin-right:2px">${escHtml(String(v))}</span>`).join('');
+  if (typeof val === 'object') return `<span style="color:var(--text-muted,#8b949e);font-size:0.75rem">${escHtml(JSON.stringify(val))}</span>`;
+  const s = String(val);
+  return escHtml(s.length > 80 ? s.slice(0,80) + '…' : s);
+}
+
+// Renders the full RFC-annotated claims table — used by both standalone Token Inspector
+// and the workflow chain modal so they show IDENTICAL content.
+function renderClaimsTable(payload) {
+  if (!payload) return '<div style="color:var(--text-muted,#8b949e)">No payload to display</div>';
+  const known   = Object.keys(CLAIM_META).filter(k => payload[k] !== undefined);
+  const unknown = Object.keys(payload).filter(k => !CLAIM_META[k]);
+
+  const rows = [...known, ...unknown].map(k => {
+    const meta     = CLAIM_META[k];
+    const typeHtml = meta ? TYPE_HTML[meta.type] : TYPE_HTML.custom;
+    const std      = meta ? `<span class="claim-std">${escHtml(meta.std)}</span>` : '<span class="claim-std" style="opacity:0.5">Custom</span>';
+    const desc     = meta ? escHtml(meta.desc) : '<span style="color:var(--text-muted,#8b949e)">User-defined custom claim</span>';
+    return `<tr>
+      <td><span class="claim-name">${escHtml(k)}</span></td>
+      <td><span class="claim-val">${formatClaimValue(k, payload[k])}</span></td>
+      <td>${std}</td>
+      <td>${typeHtml}</td>
+      <td class="claim-desc">${desc}</td>
+    </tr>`;
+  }).join('');
+
+  return `<table class="claims-table">
+    <thead><tr>
+      <th>Claim</th><th>Value</th><th>Standard</th><th>Type</th><th>Description</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+// Renders the token type summary badges (identical to standalone page header)
+function renderTokenBadges(decoded) {
+  const p = decoded.payload, h = decoded.header;
+  const isId = h.typ === 'JWT' && (p.nonce !== undefined || p.at_hash !== undefined || p.c_hash !== undefined);
+  const isMachine = !p.uid;
+  const hasDpop = !!p.cnf?.jkt;
+  const hasAct  = !!p.act;
+
+  const typeBadge = isId
+    ? '<span class="token-type-badge badge-id"><i class="bi bi-person-badge me-1"></i>ID Token</span>'
+    : isMachine
+      ? '<span class="token-type-badge badge-machine"><i class="bi bi-robot me-1"></i>Machine Token (M2M)</span>'
+      : '<span class="token-type-badge badge-user"><i class="bi bi-person me-1"></i>User Token</span>';
+  const dpopBadge = hasDpop ? '<span class="token-type-badge" style="background:rgba(45,217,198,0.1);color:var(--teal,#2dd9c6);border:1px solid rgba(45,217,198,0.25)"><i class="bi bi-fingerprint me-1"></i>DPoP-bound</span>' : '';
+  const actBadge  = hasAct  ? '<span class="token-type-badge" style="background:rgba(247,129,102,0.1);color:#f78166;border:1px solid rgba(247,129,102,0.25)"><i class="bi bi-people me-1"></i>Delegation</span>' : '';
+  const exp = p.exp ? new Date(p.exp * 1000) : null;
+  const expired = exp && exp < new Date();
+  const expBadge = exp ? `<span class="status-badge ${expired?'status-err':'status-ok'}">${expired?'⚠ Expired':'✓ Valid'} · ${exp.toLocaleString()}</span>` : '';
+
+  return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+    ${typeBadge}${dpopBadge}${actBadge}${expBadge}
+    <span style="font-size:0.78rem;color:var(--text-muted,#8b949e);margin-left:auto">alg: <code>${escHtml(h.alg||'—')}</code></span>
+  </div>`;
+}
+
 // ─── HTTP Exchange display ─────────────────────────────────────────────────────
 // Renders a reusable "Time to Token / Request / Response" section.
 // options: { url, method, statusCode, durationMs, requestDetails, response, open }
