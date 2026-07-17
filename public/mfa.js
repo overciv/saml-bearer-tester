@@ -5,6 +5,11 @@ let _factorCache   = [];
 let _challengeState = { factorId: null, pollHref: null, pollTimer: null, attempts: 0 };
 
 document.addEventListener('DOMContentLoaded', () => {
+  window._pageSave = () => {
+    const cfg = { oktaDomain: document.getElementById('oktaDomain')?.value||'', adminApiToken: document.getElementById('adminToken')?.value||'' };
+    fetch('/api/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)}).catch(()=>{});
+    if (typeof toast==='function') toast('Settings saved','success');
+  };
   initNavAuth();
   fetch('/api/settings').then(r => r.json()).then(s => {
     if (s.oktaDomain)    document.getElementById('oktaDomain').value = s.oktaDomain;

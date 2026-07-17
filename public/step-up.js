@@ -5,6 +5,7 @@ let baselineTokens = null;
 let stepUpTokens   = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+  window._pageSave = () => savePageConfig('step-up', CONFIG_FIELDS);
   initNavAuth();
   loadPageConfig('step-up', CONFIG_FIELDS);
   toggleStepUpAuth();

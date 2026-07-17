@@ -11,6 +11,7 @@ let lastSubjectDecoded = null;
 let lastResultDecoded = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+  window._pageSave = () => savePageConfig('token-exchange', CONFIG_FIELDS);
   initNavAuth();
   loadPageConfig('token-exchange', CONFIG_FIELDS);
   scopeMgr = createScopeManager('scopeTags', 'scopeInput', ['openid']);

@@ -4,6 +4,7 @@ let currentUserId = null;
 let exportedAppData = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+  window._pageSave = () => savePageConfig('admin', ['adminDomain','adminToken']);
   initNavAuth();
   // Pre-fill from server settings
   fetch('/api/settings').then(r => r.json()).then(s => {

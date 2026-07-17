@@ -7,6 +7,7 @@ let currentPrivateJwk = null;
 let currentPublicJwk = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+  window._pageSave = () => savePageConfig('dpop', CONFIG_FIELDS);
   initNavAuth();
   loadPageConfig('dpop', CONFIG_FIELDS);
   scopeMgr = createScopeManager('scopeTags', 'scopeInput', ['openid']);

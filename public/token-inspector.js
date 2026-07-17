@@ -4,6 +4,7 @@
 
 // ─── Init ──────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  window._pageSave = () => savePageConfig('token-inspector', ['oktaDomain','authServerId','clientId','clientSecret','adminApiToken']);
   initNavAuth();
   fetch('/api/settings').then(r => r.json()).then(s => {
     if (s.oktaDomain)    { document.getElementById('revOktaDomain').value = s.oktaDomain; document.getElementById('ltOktaDomain').value = s.oktaDomain; }

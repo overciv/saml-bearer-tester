@@ -4,6 +4,7 @@ let currentFlowId = null;
 let pollTimer = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+  window._pageSave = () => savePageConfig('authcode', CONFIG_FIELDS);
   initNavAuth();
   loadPageConfig('authcode', CONFIG_FIELDS);
   setupAutoFill();

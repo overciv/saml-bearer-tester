@@ -2,6 +2,7 @@
 const CONFIG_FIELDS = ['oktaDomain','authServerId','clientId','clientSecret','scope'];
 
 document.addEventListener('DOMContentLoaded', () => {
+  window._pageSave = () => savePageConfig('ropc', CONFIG_FIELDS);
   initNavAuth();
   loadPageConfig('ropc', CONFIG_FIELDS);
   ['oktaDomain','authServerId'].forEach(id =>

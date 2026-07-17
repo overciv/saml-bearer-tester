@@ -6,6 +6,7 @@ let currentAssertion = null;
 let currentPublicJwk = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+  window._pageSave = () => savePageConfig('pkjwt', CONFIG_FIELDS);
   initNavAuth();
   loadPageConfig('pkjwt', CONFIG_FIELDS);
   scopeMgr = createScopeManager('scopeTags', 'scopeInput', ['openid']);

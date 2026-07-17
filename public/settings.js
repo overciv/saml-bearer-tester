@@ -1,6 +1,7 @@
 'use strict';
 
 document.addEventListener('DOMContentLoaded', () => {
+  window._pageSave = saveSettings;
   initNavAuth();
   setupEndpointPreview();
   loadSettings();

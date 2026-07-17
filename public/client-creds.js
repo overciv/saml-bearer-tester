@@ -2,6 +2,7 @@
 const CONFIG_FIELDS = ['oktaDomain','authServerId','clientId','clientSecret','authMethod','scope'];
 
 document.addEventListener('DOMContentLoaded', () => {
+  window._pageSave = () => savePageConfig('client-creds', CONFIG_FIELDS);
   initNavAuth();
   loadPageConfig('client-creds', CONFIG_FIELDS);
   setupPreview();

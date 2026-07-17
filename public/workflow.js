@@ -313,6 +313,7 @@ function _timeAgo(date) {
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
+  window._pageSave = () => { saveChain(); if(typeof toast==='function') toast('Chain saved','success'); };
   initNavAuth();
   loadChain();
   _updateSavedBadge();

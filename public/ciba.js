@@ -16,6 +16,7 @@ let currentAuthReqId = null;
 let currentScope = [];
 
 document.addEventListener('DOMContentLoaded', () => {
+  window._pageSave = () => savePageConfig('ciba', CONFIG_FIELDS);
   initNavAuth();
   loadPageConfig('ciba', CONFIG_FIELDS);
   scopeMgr = createScopeManager('scopeTags', 'scopeInput', ['openid', 'email']);

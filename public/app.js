@@ -6,6 +6,7 @@ let scopeList = ['openid'];
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
+  window._pageSave = saveConfig;
   initNavAuth();
   loadConfig();
   renderScopes();
