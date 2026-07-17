@@ -85,7 +85,26 @@
             <div class="col-md-6"><label class="form-label">Authorization Server ID</label><input type="text" id="authServerId" class="form-control" placeholder="Leave empty for org-level"></div>
             <div class="col-md-6"><label class="form-label">Client ID *</label><input type="text" id="clientId" class="form-control" placeholder="0oa..."></div>
             <div class="col-md-6"><label class="form-label">Redirect URI</label><input type="text" id="redirectUri" class="form-control" value="http://localhost:3000/oauth/callback"></div>
-            <div class="col-md-6"><label class="form-label">Scope</label><input type="text" id="scope" class="form-control" value="openid profile email"></div>
+            <div class="col-md-3"><label class="form-label">Scope</label><input type="text" id="scope" class="form-control" value="openid profile email"></div>
+            <div class="col-md-3">
+              <label class="form-label">Baseline ACR <span style="color:var(--text-muted)">(Step 2)</span></label>
+              <select id="baselineAcr" class="form-select">
+                <option value="">None (standard auth)</option>
+                <option value="urn:okta:loa:1fa:any" selected>urn:okta:loa:1fa:any — 1 factor</option>
+                <option value="urn:okta:loa:1fa:pwd">urn:okta:loa:1fa:pwd — password only</option>
+              </select>
+              <div class="input-hint">Explicitly request 1fa so the baseline is clearly below 2fa</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Step-Up max_age <span style="color:var(--text-muted)">(Step 3)</span></label>
+              <select id="maxAge" class="form-select">
+                <option value="">Not set (reuse session)</option>
+                <option value="0" selected>0 — force fresh challenge</option>
+                <option value="60">60s — auth must be &lt; 1 min old</option>
+                <option value="300">300s — auth must be &lt; 5 min old</option>
+              </select>
+              <div class="input-hint"><code>max_age=0</code> bypasses the existing session and forces Okta to re-challenge</div>
+            </div>
             <div class="col-md-3">
               <label class="form-label">Client Authentication</label>
               <select id="clientAuthMethod" class="form-select" onchange="toggleStepUpAuth()">
@@ -125,7 +144,8 @@
           <div class="help-box">Get a standard token first (no step-up). This will show the initial low-assurance <code>acr</code> value for comparison. Optional — skip if you want to jump straight to step-up.</div>
           <div id="baselineStatus" style="display:none" class="mt-2"></div>
           <div id="baselineResult" style="display:none" class="mt-2">
-            <div id="baselineAcr" class="p-2" style="background:var(--surface2);border-radius:6px;font-size:0.8rem;font-family:monospace"></div>
+            <div id="baselineExchange"></div>
+            <div id="baselineAcr" class="mt-2 p-2" style="background:var(--surface2);border-radius:6px;font-size:0.8rem;font-family:monospace"></div>
           </div>
         </div>
       </div>
@@ -140,7 +160,8 @@
           <div class="help-box">A popup will open to Okta with the <code>acr_values</code> parameter. Okta prompts the user to satisfy the required assurance level (e.g. MFA). The resulting token will have <code>acr</code> set to the satisfied level.</div>
           <div id="stepUpStatus" style="display:none" class="mt-2"></div>
           <div id="stepUpResult" style="display:none" class="mt-2">
-            <div id="stepUpAcr" class="p-2" style="background:var(--surface2);border-radius:6px;font-size:0.8rem;font-family:monospace"></div>
+            <div id="stepUpExchange"></div>
+            <div id="stepUpAcr" class="mt-2 p-2" style="background:var(--surface2);border-radius:6px;font-size:0.8rem;font-family:monospace"></div>
           </div>
         </div>
       </div>

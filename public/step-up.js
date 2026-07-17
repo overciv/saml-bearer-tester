@@ -1,5 +1,5 @@
 'use strict';
-const CONFIG_FIELDS = ['oktaDomain','authServerId','clientId','redirectUri','scope','acrValues','clientAuthMethod','clientSecret'];
+const CONFIG_FIELDS = ['oktaDomain','authServerId','clientId','redirectUri','scope','acrValues','baselineAcr','maxAge','clientAuthMethod','clientSecret'];
 
 let baselineTokens = null;
 let stepUpTokens   = null;
@@ -24,7 +24,9 @@ function toggleStepUpAuth() {
 async function getBaseline() {
   const btn = document.getElementById('baselineBtn');
   setLoading(btn, true, '<i class="bi bi-box-arrow-up-right me-1"></i>Opening…');
-  await _doAuth(null, 'baseline');
+  // Explicitly request 1fa for baseline so the step-up genuinely needs to go higher
+  const baselineAcrVal = val('baselineAcr') || null;
+  await _doAuth(baselineAcrVal, 'baseline', null);
   setLoading(btn, false, '<i class="bi bi-box-arrow-up-right me-1"></i>Get Baseline Token');
 }
 
@@ -33,7 +35,10 @@ async function getBaseline() {
 async function requestStepUp() {
   const btn = document.getElementById('stepUpBtn');
   setLoading(btn, true, '<i class="bi bi-box-arrow-up-right me-1"></i>Opening…');
-  await _doAuth(val('acrValues'), 'stepup');
+  // max_age=0 bypasses the existing SSO session so Okta re-challenges regardless
+  const maxAgeVal = val('maxAge');
+  const maxAge = maxAgeVal !== '' && maxAgeVal !== undefined ? parseInt(maxAgeVal) : undefined;
+  await _doAuth(val('acrValues'), 'stepup', maxAge);
   setLoading(btn, false, '<i class="bi bi-box-arrow-up-right me-1"></i>Request Step-Up');
 }
 
@@ -43,7 +48,7 @@ let _pendingFlowId  = null;
 let _pendingTarget  = null; // 'baseline' | 'stepup'
 let _pollTimer      = null;
 
-async function _doAuth(acrValues, target) {
+async function _doAuth(acrValues, target, maxAge) {
   if (!val('clientId') || !val('oktaDomain')) { toast('Fill in Okta Domain and Client ID', 'warning'); return; }
 
   const authMethod = val('clientAuthMethod') || 'none';
@@ -63,6 +68,7 @@ async function _doAuth(acrValues, target) {
     privateJwk:   authMethod === 'pkjwt' ? privateJwk : undefined,
   };
   if (acrValues) body.acrValues = acrValues;
+  if (maxAge !== undefined && maxAge !== null) body.maxAge = maxAge;
 
   const { flowId, authUrl } = await fetch('/api/oauth/start', {
     method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
@@ -104,17 +110,30 @@ function handlePopupResult(data) {
     if (target === 'baseline') baselineTokens = data.tokens;
     else stepUpTokens = data.tokens;
 
-    const decoded = data.tokens.access_token ? decodeJwt(data.tokens.access_token) : null;
-    const acr  = decoded?.payload?.acr  || '—';
-    const amr  = decoded?.payload?.amr  ? decoded.payload.amr.join(', ') : '—';
-    const atime = decoded?.payload?.auth_time ? new Date(decoded.payload.auth_time*1000).toISOString().replace('T',' ').slice(0,19) : '—';
+    // amr and auth_time live in the id_token per OIDC spec; acr is in both
+    const atP = data.tokens.access_token ? decodeJwt(data.tokens.access_token)?.payload : null;
+    const itP = data.tokens.id_token     ? decodeJwt(data.tokens.id_token)?.payload     : null;
+    const acr   = atP?.acr   || itP?.acr   || '—';
+    const amr   = itP?.amr   ? itP.amr.join(', ')   : (atP?.amr ? (Array.isArray(atP.amr) ? atP.amr.join(', ') : String(atP.amr)) : '—');
+    const atime = itP?.auth_time ? new Date(itP.auth_time*1000).toISOString().replace('T',' ').slice(0,19)
+                : atP?.auth_time ? new Date(atP.auth_time*1000).toISOString().replace('T',' ').slice(0,19) : '—';
 
     document.getElementById(resultId).style.display = '';
+
+    // Raw HTTP exchange (request + response)
+    const exchangeEl = document.getElementById(target === 'baseline' ? 'baselineExchange' : 'stepUpExchange');
+    if (exchangeEl) {
+      exchangeEl.innerHTML = renderHttpExchange({
+        url: data.tokenEndpoint, statusCode: 200, durationMs: data.durationMs,
+        requestDetails: data.requestDetails, response: data.tokens
+      });
+    }
+
     document.getElementById(acrId).innerHTML =
       `<span style="color:var(--text-muted)">acr: </span><strong style="color:var(--blue)">${escHtml(acr)}</strong>
        &nbsp;&nbsp;<span style="color:var(--text-muted)">amr: </span><strong style="color:var(--blue)">[${escHtml(amr)}]</strong>
-       &nbsp;&nbsp;<span style="color:var(--text-muted)">auth_time: </span><strong style="color:var(--blue)">${escHtml(atime)}</strong>`
-      + renderHttpExchange({ statusCode:200, durationMs:data.durationMs, requestDetails:data.requestDetails, response:data.tokens });
+       &nbsp;&nbsp;<span style="color:var(--text-muted)">auth_time: </span><strong style="color:var(--blue)">${escHtml(atime)}</strong>
+       <span style="font-size:0.7rem;color:var(--text-muted);margin-left:8px">${itP ? '(amr from id_token)' : '(no id_token)'}</span>`;
 
     toast(`${target === 'baseline' ? 'Baseline' : 'Step-Up'} token received!`, 'success');
     updateComparison();
@@ -133,8 +152,16 @@ const COMPARE_KEYS = ['acr','amr','auth_time','sub','email','scp','cid','iss','e
 function updateComparison() {
   if (!baselineTokens && !stepUpTokens) return;
 
-  const bDec = baselineTokens?.access_token ? decodeJwt(baselineTokens.access_token)?.payload : null;
-  const sDec = stepUpTokens?.access_token   ? decodeJwt(stepUpTokens.access_token)?.payload   : null;
+  // Merge access_token + id_token payloads: id_token provides amr/auth_time
+  const _merge = (tokens) => {
+    const ap = tokens?.access_token ? decodeJwt(tokens.access_token)?.payload : null;
+    const ip = tokens?.id_token     ? decodeJwt(tokens.id_token)?.payload     : null;
+    if (!ap && !ip) return null;
+    // access_token claims are the authority; id_token supplements amr/auth_time/nonce
+    return { ...ip, ...ap, amr: ip?.amr || ap?.amr, auth_time: ip?.auth_time || ap?.auth_time };
+  };
+  const bDec = _merge(baselineTokens);
+  const sDec = _merge(stepUpTokens);
 
   if (!bDec && !sDec) return;
 
