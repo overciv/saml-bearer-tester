@@ -86,6 +86,22 @@
             <div class="col-md-6"><label class="form-label">Client ID *</label><input type="text" id="clientId" class="form-control" placeholder="0oa..."></div>
             <div class="col-md-6"><label class="form-label">Redirect URI</label><input type="text" id="redirectUri" class="form-control" value="http://localhost:3000/oauth/callback"></div>
             <div class="col-md-6"><label class="form-label">Scope</label><input type="text" id="scope" class="form-control" value="openid profile email"></div>
+            <div class="col-md-3">
+              <label class="form-label">Client Authentication</label>
+              <select id="clientAuthMethod" class="form-select" onchange="toggleStepUpAuth()">
+                <option value="none">None (public client)</option>
+                <option value="basic">Client Secret (Basic)</option>
+                <option value="pkjwt">Private Key JWT</option>
+              </select>
+            </div>
+            <div class="col-md-3" id="suSecretRow" style="display:none">
+              <label class="form-label">Client Secret *</label>
+              <input type="password" id="clientSecret" class="form-control" placeholder="Required for confidential clients">
+            </div>
+            <div class="col-12" id="suPkjwtRow" style="display:none">
+              <label class="form-label">Private JWK</label>
+              <textarea id="clientPrivateJwk" class="form-control" rows="3" style="font-family:monospace;font-size:0.78rem" placeholder='{"kty":"RSA","alg":"RS256","d":"...","kid":"..."}'></textarea>
+            </div>
             <div class="col-md-6"><label class="form-label">ACR Values (for step-up)</label>
               <select id="acrValues" class="form-select">
                 <option value="urn:okta:loa:2fa:any">urn:okta:loa:2fa:any — Any 2 factors</option>

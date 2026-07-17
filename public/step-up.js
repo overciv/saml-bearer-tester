@@ -1,5 +1,5 @@
 'use strict';
-const CONFIG_FIELDS = ['oktaDomain','authServerId','clientId','redirectUri','scope','acrValues'];
+const CONFIG_FIELDS = ['oktaDomain','authServerId','clientId','redirectUri','scope','acrValues','clientAuthMethod','clientSecret'];
 
 let baselineTokens = null;
 let stepUpTokens   = null;
@@ -7,11 +7,17 @@ let stepUpTokens   = null;
 document.addEventListener('DOMContentLoaded', () => {
   initNavAuth();
   loadPageConfig('step-up', CONFIG_FIELDS);
-  // Listen for popup postMessage
+  toggleStepUpAuth();
   window.addEventListener('message', (e) => {
     if (e.data?.type === 'oauth-callback') handlePopupResult(e.data);
   });
 });
+
+function toggleStepUpAuth() {
+  const m = val('clientAuthMethod');
+  document.getElementById('suSecretRow').style.display = m === 'basic'  ? '' : 'none';
+  document.getElementById('suPkjwtRow').style.display  = m === 'pkjwt'  ? '' : 'none';
+}
 
 // ─── Baseline (standard auth, no acr_values) ──────────────────────────────────
 
@@ -40,10 +46,21 @@ let _pollTimer      = null;
 async function _doAuth(acrValues, target) {
   if (!val('clientId') || !val('oktaDomain')) { toast('Fill in Okta Domain and Client ID', 'warning'); return; }
 
+  const authMethod = val('clientAuthMethod') || 'none';
+  let privateJwk;
+  if (authMethod === 'pkjwt') {
+    const raw = document.getElementById('clientPrivateJwk')?.value?.trim();
+    if (!raw) { toast('Paste a Private JWK for PKJWT auth', 'warning'); return; }
+    try { privateJwk = JSON.parse(raw); } catch { toast('Invalid Private JWK JSON', 'error'); return; }
+  }
+
   const body = {
     oktaDomain: val('oktaDomain'), authServerId: val('authServerId'),
     clientId: val('clientId'), redirectUri: val('redirectUri') || 'http://localhost:3000/oauth/callback',
-    scope: val('scope') || 'openid profile email'
+    scope: val('scope') || 'openid profile email',
+    clientAuthMethod: authMethod,
+    clientSecret: authMethod === 'basic' ? (document.getElementById('clientSecret')?.value || '') : undefined,
+    privateJwk:   authMethod === 'pkjwt' ? privateJwk : undefined,
   };
   if (acrValues) body.acrValues = acrValues;
 
