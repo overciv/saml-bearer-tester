@@ -169,8 +169,9 @@ function createScopeManager(containerId, inputId, initial = []) {
   return { state, add, remove, render, getAll };
 }
 
-// Global fields synced across all tester pages via oauthst-global AND config.json
-const GLOBAL_FIELDS = ['oktaDomain', 'authServerId', 'clientId', 'clientSecret'];
+// Only these two fields are shared across ALL pages.
+// Everything else (authServerId, clientId, clientSecret, …) is saved independently per page.
+const GLOBAL_FIELDS = ['oktaDomain', 'adminApiToken'];
 
 // Config persistence per page prefix
 function savePageConfig(prefix, fieldIds) {
@@ -216,19 +217,18 @@ function loadPageConfig(prefix, fieldIds) {
     }
   } catch {}
 
-  // 3. Server config.json (authoritative — overwrites stale localStorage)
+  // 3. Server config.json — only syncs the two truly global fields (oktaDomain, adminApiToken).
+  //    clientId, clientSecret, authServerId are now per-page only.
   fetch('/api/settings').then(r => r.json()).then(s => {
-    const serverVals = { oktaDomain: s.oktaDomain, authServerId: s.authServerId, clientId: s.clientId, clientSecret: s.clientSecret };
+    const serverVals = { oktaDomain: s.oktaDomain, adminApiToken: s.adminApiToken };
     let changed = false;
     fieldIds.filter(id => GLOBAL_FIELDS.includes(id) && serverVals[id]).forEach(id => {
       const el = document.getElementById(id);
       if (el && el.value !== serverVals[id]) { el.value = serverVals[id]; changed = true; }
     });
-    // Sync server values back into localStorage so they're immediately available next load
     const existing = JSON.parse(localStorage.getItem('oauthst-global') || '{}');
     localStorage.setItem('oauthst-global', JSON.stringify({ ...existing, ...Object.fromEntries(GLOBAL_FIELDS.filter(id => serverVals[id]).map(id => [id, serverVals[id]])) }));
-    // Trigger endpoint preview update if any field changed
-    if (changed) ['oktaDomain', 'authServerId'].forEach(id => document.getElementById(id)?.dispatchEvent(new Event('input')));
+    if (changed) document.getElementById('oktaDomain')?.dispatchEvent(new Event('input'));
   }).catch(() => {});
 }
 

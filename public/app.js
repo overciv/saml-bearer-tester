@@ -352,8 +352,8 @@ function saveConfig() {
   cfg.attributes = collectAttributes();
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
 
-  // Sync global fields to localStorage + server
-  const GLOBAL = ['oktaDomain', 'authServerId', 'clientId', 'clientSecret'];
+  // Only oktaDomain is synced globally — clientId/secret/authServerId are per-page
+  const GLOBAL = ['oktaDomain'];
   const existing = JSON.parse(localStorage.getItem('oauthst-global') || '{}');
   const update = {};
   GLOBAL.forEach(id => { if (cfg[id]) update[id] = cfg[id]; });
@@ -370,7 +370,8 @@ function loadConfig() {
     const globalRaw = localStorage.getItem('oauthst-global');
     if (globalRaw) {
       const g = JSON.parse(globalRaw);
-      ['oktaDomain', 'authServerId', 'clientId', 'clientSecret'].forEach(id => {
+      // Only oktaDomain from global; everything else is per-page
+      ['oktaDomain'].forEach(id => {
         const el = document.getElementById(id);
         if (el && g[id]) el.value = g[id];
       });
@@ -391,17 +392,15 @@ function loadConfig() {
     } catch {}
   }
 
-  // 3. Server config.json (authoritative, async)
+  // 3. Server config.json — only oktaDomain is global; rest is per-page
   fetch('/api/settings').then(r => r.json()).then(s => {
-    ['oktaDomain', 'authServerId', 'clientId', 'clientSecret'].forEach(id => {
-      if (s[id]) {
-        const el = document.getElementById(id);
-        if (el && el.value !== s[id]) el.value = s[id];
-      }
-    });
+    if (s.oktaDomain) {
+      const el = document.getElementById('oktaDomain');
+      if (el && el.value !== s.oktaDomain) el.value = s.oktaDomain;
+    }
     updateTokenEndpointPreview();
     const existing = JSON.parse(localStorage.getItem('oauthst-global') || '{}');
-    localStorage.setItem('oauthst-global', JSON.stringify({ ...existing, ...Object.fromEntries(['oktaDomain','authServerId','clientId','clientSecret'].filter(id => s[id]).map(id => [id, s[id]])) }));
+    if (s.oktaDomain) localStorage.setItem('oauthst-global', JSON.stringify({ ...existing, oktaDomain: s.oktaDomain }));
   }).catch(() => { updateTokenEndpointPreview(); });
 }
 
