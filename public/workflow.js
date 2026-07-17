@@ -154,11 +154,156 @@ let dragType = null;
 
 const G = () => JSON.parse(localStorage.getItem('oauthst-global') || '{}');
 
+// ─── Named chain saves ────────────────────────────────────────────────────────
+
+const SAVED_KEY = 'workflow-saved-chains';
+
+function getSavedChains() {
+  try { return JSON.parse(localStorage.getItem(SAVED_KEY) || '[]'); } catch { return []; }
+}
+function _writeSavedChains(chains) { localStorage.setItem(SAVED_KEY, JSON.stringify(chains)); }
+
+function openSaveDialog() {
+  if (!chain.length) { toast('Add some steps first', 'warning'); return; }
+  const def = chain.map(s => STEP_DEFS[s.type]?.label || s.type).join(' → ').slice(0, 50);
+  document.getElementById('saveChainName').value = def;
+  document.getElementById('saveChainModal').style.display = 'flex';
+  setTimeout(() => { const i = document.getElementById('saveChainName'); i.focus(); i.select(); }, 50);
+}
+
+function closeSaveModal() {
+  document.getElementById('saveChainModal').style.display = 'none';
+}
+
+function confirmSave() {
+  const name = document.getElementById('saveChainName').value.trim();
+  if (!name) { toast('Enter a name', 'warning'); return; }
+  const chains = getSavedChains();
+  chains.unshift({
+    id: 'chain_' + Date.now(),
+    name,
+    steps: chain.map(s => ({ id: s.id, type: s.type, config: { ...s.config }, bindings: { ...s.bindings } })),
+    stepCount: chain.length,
+    savedAt: new Date().toISOString()
+  });
+  _writeSavedChains(chains);
+  closeSaveModal();
+  _updateSavedBadge();
+  toast(`"${name}" saved`, 'success');
+}
+
+function toggleSavedPanel() {
+  const p = document.getElementById('savedChainsPanel');
+  if (p.style.display === 'none') { _renderSavedList(); p.style.display = ''; }
+  else closeSavedPanel();
+}
+function closeSavedPanel() { document.getElementById('savedChainsPanel').style.display = 'none'; }
+
+function _renderSavedList() {
+  const chains = getSavedChains();
+  const list = document.getElementById('savedChainsList');
+  if (!chains.length) {
+    list.innerHTML = '<div style="text-align:center;color:var(--text-muted);font-size:0.82rem;padding:24px 12px">No saved chains yet.<br>Build a chain and click <strong>Save</strong>.</div>';
+    return;
+  }
+  list.innerHTML = chains.map(c => {
+    const d = new Date(c.savedAt);
+    const ago = _timeAgo(d);
+    return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface2)">
+      <div style="font-weight:600;font-size:0.83rem;margin-bottom:2px">${escHtml(c.name)}</div>
+      <div style="font-size:0.7rem;color:var(--text-muted)">${c.stepCount} step${c.stepCount!==1?'s':''} · ${escHtml(ago)}</div>
+      <div class="d-flex gap-2 mt-2 align-items-center">
+        <button class="btn btn-sm" style="background:var(--blue);color:#0d1117;font-weight:600;border:none;font-size:0.72rem" onclick="loadSavedChain('${c.id}')">
+          <i class="bi bi-arrow-right-circle me-1"></i>Load
+        </button>
+        <button class="btn btn-outline-secondary btn-sm" style="font-size:0.72rem" onclick="duplicateSavedChain('${c.id}')">
+          <i class="bi bi-copy"></i>
+        </button>
+        <button class="btn btn-sm ms-auto" style="color:var(--red);border:1px solid rgba(248,81,73,0.4);background:rgba(248,81,73,0.06);font-size:0.72rem" onclick="deleteSavedChain('${c.id}')">
+          <i class="bi bi-trash"></i>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function loadSavedChain(id) {
+  const saved = getSavedChains().find(c => c.id === id);
+  if (!saved) { toast('Chain not found', 'error'); return; }
+  if (chain.length && !confirm(`Load "${saved.name}"?\nThe current chain will be replaced.`)) return;
+
+  chain = saved.steps.map(s => ({
+    ...makeStep(s.type, s.id),
+    config: s.config || {},
+    bindings: s.bindings || {}
+  }));
+  outputStore = {};
+  saveChain();
+  renderPipeline();
+  closeSavedPanel();
+  toast(`Loaded "${saved.name}"`, 'success');
+}
+
+function duplicateSavedChain(id) {
+  const all    = getSavedChains();
+  const saved  = all.find(c => c.id === id);
+  if (!saved) return;
+
+  // Build old→new ID map so bindings stay correct
+  const idMap = {};
+  saved.steps.forEach(s => { idMap[s.id] = 's_' + Date.now() + '_' + Math.random().toString(36).slice(2,6); });
+
+  const newSteps = saved.steps.map(s => {
+    const newBindings = {};
+    Object.entries(s.bindings || {}).forEach(([inp, b]) => {
+      newBindings[inp] = { ...b, stepId: idMap[b.stepId] || b.stepId,
+        value: b.value ? b.value.replace(b.stepId, idMap[b.stepId] || b.stepId) : b.value };
+    });
+    return { id: idMap[s.id], type: s.type, config: { ...s.config }, bindings: newBindings };
+  });
+
+  all.unshift({ id: 'chain_' + Date.now(), name: saved.name + ' (copy)', steps: newSteps,
+    stepCount: newSteps.length, savedAt: new Date().toISOString() });
+  _writeSavedChains(all);
+  _renderSavedList();
+  _updateSavedBadge();
+  toast(`Duplicated as "${saved.name} (copy)"`, 'success');
+}
+
+function deleteSavedChain(id) {
+  const chains = getSavedChains();
+  const c = chains.find(x => x.id === id);
+  if (!confirm(`Delete "${c?.name}"?`)) return;
+  _writeSavedChains(chains.filter(x => x.id !== id));
+  _renderSavedList();
+  _updateSavedBadge();
+  toast('Deleted', 'info');
+}
+
+function _updateSavedBadge() {
+  const count = getSavedChains().length;
+  const btn = document.getElementById('loadChainsBtn');
+  if (!btn) return;
+  btn.innerHTML = `<i class="bi bi-bookmark-star me-1"></i>Saved${count
+    ? ` <span style="background:var(--blue);color:#0d1117;border-radius:10px;padding:0 5px;font-size:0.65rem;font-weight:700;margin-left:2px">${count}</span>`
+    : ''}`;
+}
+
+function _timeAgo(date) {
+  const s = (Date.now() - date) / 1000;
+  if (s < 60) return 'just now';
+  if (s < 3600) return `${Math.floor(s/60)}m ago`;
+  if (s < 86400) return `${Math.floor(s/3600)}h ago`;
+  if (s < 86400*7) return `${Math.floor(s/86400)}d ago`;
+  return date.toLocaleDateString('en', { month:'short', day:'numeric' });
+}
+
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   initNavAuth();
   loadChain();
+  _updateSavedBadge();
 
   // Import tokens from auth-code or client-creds pages
   const imported = localStorage.getItem('workflow-import');
