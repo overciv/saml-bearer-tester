@@ -401,9 +401,14 @@ async function sendAppRequest() {
     showCreateTab('response');
 
     if (res.success) {
-      const appId = res.response.id;
-      const appName = payload.name; // 'oidc_client' or 'template_saml_2_0'
+      const appId   = res.response.id;
+      const appName = payload.name;
       toast(`App created! ID: ${appId}`, 'success');
+
+      // Show delete button
+      const deleteBtn = document.getElementById('deleteAppBtn');
+      deleteBtn.dataset.appId = appId;
+      deleteBtn.style.display = '';
 
       // Assign owner if set
       const ownerLogin = val('appOwner');
@@ -415,6 +420,39 @@ async function sendAppRequest() {
     toast('Error: ' + e.message, 'error');
   } finally {
     setLoading(btn, false, '<i class="bi bi-send-fill me-1"></i>Send to Okta');
+  }
+}
+
+// ─── Delete created app ───────────────────────────────────────────────────────
+async function confirmDeleteApp() {
+  const btn   = document.getElementById('deleteAppBtn');
+  const appId = btn.dataset.appId;
+  if (!appId) return;
+
+  if (!confirm(`Delete app ${appId} from Okta?\n\nThis will deactivate then permanently delete it. This cannot be undone.`)) return;
+
+  setLoading(btn, true, '<i class="bi bi-trash me-1"></i>Deleting…');
+  try {
+    const res = await fetch('/api/admin/delete-app', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(adminParams({ appId }))
+    }).then(r => r.json());
+
+    if (res.success) {
+      btn.disabled = true;
+      btn.innerHTML = '<i class="bi bi-check-circle me-1"></i>App deleted';
+      btn.style.cssText = 'color:var(--green);border:1px solid rgba(63,185,80,0.3);background:rgba(63,185,80,0.08)';
+      document.getElementById('createAppStatus').innerHTML +=
+        ' <span class="status-badge" style="background:rgba(248,81,73,0.12);color:var(--red);border:1px solid rgba(248,81,73,0.3)">Deleted</span>';
+      toast(`App ${appId} deleted`, 'success');
+    } else {
+      toast('Delete failed: ' + (res.error || `HTTP ${res.statusCode}`), 'error');
+      setLoading(btn, false, '<i class="bi bi-trash me-1"></i>Delete this app');
+    }
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+    setLoading(btn, false, '<i class="bi bi-trash me-1"></i>Delete this app');
   }
 }
 

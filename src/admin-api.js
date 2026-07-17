@@ -137,4 +137,25 @@ async function getSystemLog({ oktaDomain, adminApiToken, since, until, limit = 2
   } catch (e) { return { success: false, statusCode: 0, error: e.message }; }
 }
 
-module.exports = { createApp, getApp, cloneApp, findUser, listFactors, resetFactor, getSystemLog, assignAppOwner };
+async function deleteApp({ oktaDomain, adminApiToken, appId }) {
+  const base = `https://${oktaDomain}/api/v1/apps/${appId}`;
+  const hdrs = plain(adminApiToken);
+  const steps = [];
+
+  // Step 1: deactivate (Okta requires INACTIVE before DELETE)
+  const t0 = Date.now();
+  const deact = await axios.post(`${base}/lifecycle/deactivate`, {}, { headers: hdrs, validateStatus: () => true });
+  steps.push({ step: 'deactivate', statusCode: deact.status, ok: deact.status === 200, durationMs: Date.now() - t0 });
+  if (deact.status !== 200) {
+    return { success: false, statusCode: deact.status, error: deact.data?.errorSummary || `Deactivate failed HTTP ${deact.status}`, steps };
+  }
+
+  // Step 2: delete
+  const t1 = Date.now();
+  const del = await axios.delete(base, { headers: hdrs, validateStatus: () => true });
+  steps.push({ step: 'delete', statusCode: del.status, ok: del.status === 204, durationMs: Date.now() - t1 });
+
+  return { success: del.status === 204, statusCode: del.status, steps };
+}
+
+module.exports = { createApp, getApp, cloneApp, findUser, listFactors, resetFactor, getSystemLog, assignAppOwner, deleteApp };
