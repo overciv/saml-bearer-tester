@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Auth Code + PKCE — Okta OAuth Super Tester</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
+  <style>
+    :root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--text:#c9d1d9;--text-muted:#8b949e;--blue:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--purple:#bc8cff;--orange:#ffa657;}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,monospace;}
+    .navbar-brand{font-weight:700;font-size:1.1rem;}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;}
+    .card-header{background:var(--surface2);border-bottom:1px solid var(--border);border-radius:10px 10px 0 0!important;padding:14px 20px;}
+    .section-title{font-weight:600;font-size:0.95rem;display:flex;align-items:center;gap:8px;}
+    .section-title .bi{color:var(--blue);}
+    .form-control,.form-select{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:0.875rem;}
+    .form-control:focus,.form-select:focus{background:var(--surface2);border-color:var(--blue);color:var(--text);box-shadow:0 0 0 3px rgba(88,166,255,0.15);}
+    .form-control::placeholder{color:var(--text-muted);}
+    .form-label{font-size:0.8rem;color:var(--text-muted);font-weight:500;margin-bottom:4px;}
+    .input-hint{font-size:0.72rem;color:var(--text-muted);margin-top:3px;}
+    .btn-primary{background:var(--blue);border-color:var(--blue);color:#0d1117;font-weight:600;}
+    .btn-primary:hover{background:#79b8ff;border-color:#79b8ff;color:#0d1117;}
+    .btn-outline-secondary{border-color:var(--border);color:var(--text-muted);font-size:0.8rem;}
+    .btn-outline-secondary:hover{background:var(--surface2);color:var(--text);}
+    .btn-sm{padding:4px 10px;font-size:0.775rem;}
+    .code-block{background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:'SF Mono','Fira Code',monospace;font-size:0.78rem;line-height:1.6;overflow:auto;max-height:360px;position:relative;white-space:pre-wrap;word-break:break-all;}
+    .code-block.json{color:#b5cea8;}
+    .copy-btn{position:absolute;top:8px;right:8px;z-index:10;}
+    .help-box{background:rgba(88,166,255,0.05);border:1px solid rgba(88,166,255,0.15);border-radius:8px;padding:12px 14px;font-size:0.8rem;color:var(--text-muted);margin-bottom:16px;}
+    .help-box strong{color:var(--blue);}
+    .help-box code{background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:0.75rem;color:var(--orange);}
+    .status-badge{font-size:0.7rem;padding:2px 7px;border-radius:10px;font-weight:700;}
+    .status-ok{background:rgba(63,185,80,0.15);color:var(--green);border:1px solid rgba(63,185,80,0.3);}
+    .status-err{background:rgba(248,81,73,0.15);color:var(--red);border:1px solid rgba(248,81,73,0.3);}
+    .spinner-border{width:1rem;height:1rem;border-width:2px;}
+    .tabs-nav{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap;}
+    .tab-btn{padding:5px 14px;border-radius:6px;font-size:0.8rem;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;transition:all 0.15s;}
+    .tab-btn:hover{background:var(--surface2);color:var(--text);}
+    .tab-btn.active{background:rgba(88,166,255,0.12);color:var(--blue);border-color:rgba(88,166,255,0.3);}
+    .jwt-decoded{background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+    .jwt-part{padding:10px 14px;border-bottom:1px solid var(--border);}
+    .jwt-part:last-child{border-bottom:none;}
+    .jwt-part-label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;}
+    .jwt-header-label{color:var(--red);}
+    .jwt-payload-label{color:var(--purple);}
+    .jwt-sig-label{color:var(--blue);}
+    .jwt-content{font-family:monospace;font-size:0.775rem;color:#b5cea8;white-space:pre-wrap;}
+    .step-link{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;color:var(--text-muted);text-decoration:none;font-size:0.875rem;transition:all 0.15s;margin-bottom:2px;}
+    .step-link:hover{background:var(--surface2);color:var(--text);}
+    .step-num{width:22px;height:22px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:0.7rem;font-weight:700;flex-shrink:0;}
+    ::-webkit-scrollbar{width:6px;height:6px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-dark sticky-top" style="background:var(--surface);border-bottom:1px solid var(--border);">
+  <div class="container-fluid px-4">
+    <span class="navbar-brand"><i class="bi bi-lightning-charge-fill me-2" style="color:var(--blue)"></i>Okta OAuth Super Tester</span>
+    <div class="d-flex align-items-center gap-2">
+      <a href="/home.html" class="btn btn-sm btn-outline-secondary"><i class="bi bi-house-fill me-1"></i>Home</a>
+      <div id="navAuthArea"></div>
+    </div>
+  </div>
+</nav>
+<div class="container-fluid px-4 py-4">
+  <div class="row g-4">
+    <div class="col-lg-2 d-none d-lg-block">
+      <div style="position:sticky;top:70px;">
+        <div class="mb-3" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;padding:0 12px;">Steps</div>
+        <a href="#step-config" class="step-link"><span class="step-num">1</span><span>Config</span></a>
+        <a href="#step-auth" class="step-link"><span class="step-num">2</span><span>Authorize</span></a>
+        <a href="#step-tokens" class="step-link"><span class="step-num">3</span><span>Tokens</span></a>
+      </div>
+    </div>
+    <div class="col-lg-10">
+
+      <div id="step-config" class="card mb-4">
+        <div class="card-header"><div class="section-title"><i class="bi bi-building"></i>Step 1 — Configuration</div></div>
+        <div class="card-body p-4">
+          <div class="help-box"><strong>Auth Code + PKCE</strong> — human authentication. The user logs in via a browser popup. PKCE is generated automatically (no client secret needed for public clients).</div>
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Okta Domain *</label><input type="text" id="oktaDomain" class="form-control" placeholder="yourorg.okta.com"></div>
+            <div class="col-md-6"><label class="form-label">Authorization Server ID</label><input type="text" id="authServerId" class="form-control" placeholder="Leave empty for org-level"></div>
+            <div class="col-md-6"><label class="form-label">Client ID *</label><input type="text" id="clientId" class="form-control" placeholder="0oa..."></div>
+            <div class="col-md-6">
+              <label class="form-label">Redirect URI</label>
+              <input type="text" id="redirectUri" class="form-control" value="http://localhost:3000/oauth/callback">
+              <div class="input-hint">Must be registered in the Okta app</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Scopes</label>
+              <input type="text" id="scope" class="form-control" value="openid profile email">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="step-auth" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="section-title"><i class="bi bi-person-badge"></i>Step 2 — Authorization</div>
+          <button class="btn btn-primary btn-sm" id="authorizeBtn" onclick="startAuth()"><i class="bi bi-box-arrow-up-right me-1"></i>Open Okta Login</button>
+        </div>
+        <div class="card-body p-4">
+          <div class="help-box">A popup will open to Okta. The user logs in. PKCE verifier is generated and stored server-side. The popup closes automatically and tokens appear below.</div>
+          <div id="authStatus" class="mt-2" style="display:none">
+            <div id="authStatusContent"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="step-tokens" class="card mb-4">
+        <div class="card-header"><div class="section-title"><i class="bi bi-ticket-detailed"></i>Step 3 — Tokens</div></div>
+        <div class="card-body p-4">
+          <div id="tokensPlaceholder" style="color:var(--text-muted);font-size:0.82rem">Complete authorization to see tokens here.</div>
+          <div id="tokensContent" style="display:none">
+            <div id="tokenResultStatus" class="mb-3"></div>
+            <div class="tabs-nav" id="tokenTabs">
+              <button class="tab-btn active" onclick="showTTab('access')">Access Token</button>
+              <button class="tab-btn" onclick="showTTab('id')">ID Token</button>
+              <button class="tab-btn" onclick="showTTab('raw')">Raw Response</button>
+            </div>
+            <div id="tTabAccess"><div id="accessDecoded"></div></div>
+            <div id="tTabId" style="display:none"><div id="idDecoded"></div></div>
+            <div id="tTabRaw" style="display:none"><div class="position-relative"><div class="code-block json" id="rawResponse"></div><button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('rawResponse')"><i class="bi bi-clipboard"></i></button></div></div>
+            <div class="mt-3 d-flex gap-2 flex-wrap">
+              <button class="btn btn-outline-secondary btn-sm" onclick="exportToWorkflow()"><i class="bi bi-diagram-3 me-1"></i>Export to Test Chain</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="common.js"></script>
+<script src="authcode.js"></script>
+</body>
+</html>

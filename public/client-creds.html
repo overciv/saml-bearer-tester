@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Client Credentials — Okta OAuth Super Tester</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
+  <style>
+    :root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--text:#c9d1d9;--text-muted:#8b949e;--blue:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--purple:#bc8cff;--orange:#ffa657;--emerald:#3dcb7a;}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,monospace;}
+    .navbar-brand{font-weight:700;font-size:1.1rem;}
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:10px;}
+    .card-header{background:var(--surface2);border-bottom:1px solid var(--border);border-radius:10px 10px 0 0!important;padding:14px 20px;}
+    .section-title{font-weight:600;font-size:0.95rem;display:flex;align-items:center;gap:8px;}
+    .section-title .bi{color:var(--emerald);}
+    .form-control,.form-select{background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:0.875rem;}
+    .form-control:focus,.form-select:focus{background:var(--surface2);border-color:var(--emerald);color:var(--text);box-shadow:0 0 0 3px rgba(61,203,122,0.15);}
+    .form-control::placeholder{color:var(--text-muted);}
+    .form-label{font-size:0.8rem;color:var(--text-muted);font-weight:500;margin-bottom:4px;}
+    .input-hint{font-size:0.72rem;color:var(--text-muted);margin-top:3px;}
+    .btn-primary{background:var(--emerald);border-color:var(--emerald);color:#0d1117;font-weight:600;}
+    .btn-primary:hover{background:#5de08f;border-color:#5de08f;color:#0d1117;}
+    .btn-outline-secondary{border-color:var(--border);color:var(--text-muted);font-size:0.8rem;}
+    .btn-outline-secondary:hover{background:var(--surface2);color:var(--text);}
+    .btn-sm{padding:4px 10px;font-size:0.775rem;}
+    .code-block{background:#0d1117;border:1px solid var(--border);border-radius:8px;padding:14px;font-family:'SF Mono','Fira Code',monospace;font-size:0.78rem;line-height:1.6;overflow:auto;max-height:360px;position:relative;white-space:pre-wrap;word-break:break-all;}
+    .code-block.json{color:#b5cea8;}
+    .copy-btn{position:absolute;top:8px;right:8px;z-index:10;}
+    .help-box{background:rgba(61,203,122,0.04);border:1px solid rgba(61,203,122,0.15);border-radius:8px;padding:12px 14px;font-size:0.8rem;color:var(--text-muted);margin-bottom:16px;}
+    .help-box strong{color:var(--emerald);}
+    .help-box code{background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:0.75rem;color:var(--orange);}
+    .status-badge{font-size:0.7rem;padding:2px 7px;border-radius:10px;font-weight:700;}
+    .status-ok{background:rgba(63,185,80,0.15);color:var(--green);border:1px solid rgba(63,185,80,0.3);}
+    .status-err{background:rgba(248,81,73,0.15);color:var(--red);border:1px solid rgba(248,81,73,0.3);}
+    .spinner-border{width:1rem;height:1rem;border-width:2px;}
+    .tabs-nav{display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap;}
+    .tab-btn{padding:5px 14px;border-radius:6px;font-size:0.8rem;border:1px solid var(--border);background:transparent;color:var(--text-muted);cursor:pointer;}
+    .tab-btn:hover{background:var(--surface2);color:var(--text);}
+    .tab-btn.active{background:rgba(61,203,122,0.1);color:var(--emerald);border-color:rgba(61,203,122,0.3);}
+    .jwt-decoded{background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+    .jwt-part{padding:10px 14px;border-bottom:1px solid var(--border);}
+    .jwt-part:last-child{border-bottom:none;}
+    .jwt-part-label{font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:6px;}
+    .jwt-header-label{color:var(--red);}.jwt-payload-label{color:var(--purple);}.jwt-sig-label{color:var(--blue);}
+    .jwt-content{font-family:monospace;font-size:0.775rem;color:#b5cea8;white-space:pre-wrap;}
+    ::-webkit-scrollbar{width:6px;height:6px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-dark sticky-top" style="background:var(--surface);border-bottom:1px solid var(--border);">
+  <div class="container-fluid px-4">
+    <span class="navbar-brand"><i class="bi bi-lightning-charge-fill me-2" style="color:var(--blue)"></i>Okta OAuth Super Tester</span>
+    <div class="d-flex align-items-center gap-2">
+      <a href="/home.html" class="btn btn-sm btn-outline-secondary"><i class="bi bi-house-fill me-1"></i>Home</a>
+      <div id="navAuthArea"></div>
+    </div>
+  </div>
+</nav>
+<div class="container py-4" style="max-width:760px">
+
+  <div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <div class="section-title"><i class="bi bi-robot"></i>Client Credentials — M2M Token</div>
+      <button class="btn btn-primary btn-sm" id="getTokenBtn" onclick="getToken()"><i class="bi bi-play-fill me-1"></i>Get Token</button>
+    </div>
+    <div class="card-body p-4">
+      <div class="help-box"><strong>Machine-to-machine</strong> — no user involved. The service authenticates directly with Okta using its client credentials and receives an access token immediately.</div>
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label">Okta Domain *</label><input type="text" id="oktaDomain" class="form-control" placeholder="yourorg.okta.com"></div>
+        <div class="col-md-6"><label class="form-label">Authorization Server ID</label><input type="text" id="authServerId" class="form-control" placeholder="Leave empty for org-level"></div>
+        <div class="col-md-6"><label class="form-label">Client ID *</label><input type="text" id="clientId" class="form-control" placeholder="0oa..."></div>
+        <div class="col-md-6">
+          <label class="form-label">Client Auth</label>
+          <select id="authMethod" class="form-select" onchange="togglePkjwt()">
+            <option value="basic">Client Secret (Basic)</option>
+            <option value="pkjwt">Private Key JWT</option>
+          </select>
+        </div>
+        <div class="col-12" id="secretRow"><label class="form-label">Client Secret *</label><input type="password" id="clientSecret" class="form-control"></div>
+        <div class="col-12" id="pkjwtRow" style="display:none"><label class="form-label">Private JWK *</label><textarea id="privateJwk" class="form-control" rows="3" style="font-family:monospace;font-size:0.78rem" placeholder='{"kty":"RSA","alg":"RS256","d":"...","kid":"..."}' ></textarea></div>
+        <div class="col-12"><label class="form-label">Scope</label><input type="text" id="scope" class="form-control" placeholder="openid" value="openid"></div>
+      </div>
+      <div class="mt-3 p-3" style="background:var(--surface2);border-radius:8px;font-size:0.8rem;">
+        <span style="color:var(--text-muted)">Token endpoint: </span>
+        <span id="endpointPreview" style="color:var(--orange);font-family:monospace;font-size:0.75rem;">—</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="resultSection" style="display:none">
+    <div class="card">
+      <div class="card-header"><div class="section-title"><i class="bi bi-ticket-detailed"></i>Result</div></div>
+      <div class="card-body p-4">
+        <div id="resultStatus" class="mb-3"></div>
+        <div class="tabs-nav" id="resTabs">
+          <button class="tab-btn active" onclick="showRTab('decoded')">Access Token</button>
+          <button class="tab-btn" onclick="showRTab('raw')">Raw Response</button>
+        </div>
+        <div id="rTabDecoded"><div id="accessDecoded"></div></div>
+        <div id="rTabRaw" style="display:none"><div class="position-relative"><div class="code-block json" id="rawResponse"></div><button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('rawResponse')"><i class="bi bi-clipboard"></i></button></div></div>
+        <div class="mt-3 d-flex gap-2">
+          <button class="btn btn-outline-secondary btn-sm" onclick="exportToWorkflow()"><i class="bi bi-diagram-3 me-1"></i>Export to Test Chain</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="common.js"></script>
+<script src="client-creds.js"></script>
+</body>
+</html>

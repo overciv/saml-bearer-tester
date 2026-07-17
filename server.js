@@ -10,6 +10,7 @@ const { generatePkjwtKeyPair, generateClientAssertion, validateClientAssertion }
 const { backchannelAuthorize, pollToken } = require('./src/ciba');
 const { exchange: tokenExchange } = require('./src/token-exchange');
 const { revokeAndVerify, getTokenLifetime } = require('./src/token-inspector');
+const { startFlow, handleCallback, getFlowStatus, clientCredentials } = require('./src/auth-code');
 const { createApp, getApp, cloneApp, findUser, listFactors, resetFactor, getSystemLog, assignAppOwner, deleteApp, factorChallenge, factorPoll } = require('./src/admin-api');
 const { getConfig, saveConfig, getSigningKey, generateSigningKey, getPublicJwks, getPublicConfig } = require('./src/config');
 const { requireAuth, loginHandler, callbackHandler, logoutHandler, meHandler } = require('./src/auth');
@@ -201,6 +202,46 @@ app.post('/api/pkjwt/introspect', async (req, res) => {
 });
 
 // ─── CIBA routes ──────────────────────────────────────────────────────────────
+
+// ─── Auth Code + PKCE + Client Credentials ────────────────────────────────────
+
+app.post('/api/oauth/start', (req, res) => {
+  try { res.json(startFlow(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.get('/oauth/callback', async (req, res) => {
+  const result = await handleCallback(req.query);
+  const { flowId, status, error } = result;
+  const isOk = status === 'success';
+  const statusResult = flowId ? getFlowStatus(flowId) : null;
+  const tokens = statusResult?.tokens || null;
+
+  res.send(`<!DOCTYPE html><html><head><title>${isOk ? 'Login successful' : 'Login failed'}</title>
+<style>body{font-family:system-ui;background:#0d1117;color:#c9d1d9;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;flex-direction:column;gap:12px}</style>
+</head><body>
+<div style="font-size:2.5rem">${isOk ? '✅' : '❌'}</div>
+<div style="font-weight:600">${isOk ? 'Authentication successful' : 'Authentication failed'}</div>
+<div style="font-size:0.82rem;color:#8b949e">${isOk ? 'You can close this window' : escHtmlServer(error || 'Unknown error')}</div>
+<script>
+  const payload = ${JSON.stringify({ type:'oauth-callback', flowId, status:'${status}', tokens: isOk ? tokens : null, error: isOk ? null : (error||'failed') })};
+  if (window.opener) { try { window.opener.postMessage(payload, '*'); } catch(e){} }
+  if (${isOk}) setTimeout(() => { try { window.close(); } catch(e){} }, 1200);
+</script></body></html>`);
+});
+
+app.get('/api/oauth/status/:flowId', (req, res) => {
+  const s = getFlowStatus(req.params.flowId);
+  if (!s) return res.status(404).json({ error: 'Flow not found or expired' });
+  res.json(s);
+});
+
+app.post('/api/oauth/client-creds', async (req, res) => {
+  try { res.json(await clientCredentials(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+function escHtmlServer(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 // ─── Token Inspector routes (Thématique 2) ────────────────────────────────────
 

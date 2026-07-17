@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Chain Builder — Okta OAuth Super Tester</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
+  <style>
+    :root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--text:#c9d1d9;--text-muted:#8b949e;--blue:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--purple:#bc8cff;--orange:#ffa657;--teal:#2dd9c6;--coral:#f78166;--amber:#e3b341;--emerald:#3dcb7a;}
+    *{box-sizing:border-box;}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,monospace;height:100vh;display:flex;flex-direction:column;margin:0;}
+    .topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0;}
+    .topbar-title{font-weight:700;font-size:1rem;display:flex;align-items:center;gap:8px;}
+    .main-layout{display:flex;flex:1;overflow:hidden;}
+
+    /* Catalog */
+    .catalog{width:260px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:12px;}
+    .cat-header{font-size:0.68rem;text-transform:uppercase;letter-spacing:0.08em;font-weight:700;color:var(--text-muted);padding:8px 6px 4px;margin-top:8px;}
+    .cat-header:first-child{margin-top:0;}
+    .catalog-item{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;margin-bottom:2px;border:1px solid transparent;transition:all 0.12s;font-size:0.8rem;}
+    .catalog-item:hover{background:var(--surface2);border-color:var(--border);}
+    .catalog-item .ci-icon{width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:0.8rem;flex-shrink:0;}
+    .catalog-item .ci-name{font-weight:600;}
+    .catalog-item .ci-desc{font-size:0.68rem;color:var(--text-muted);}
+
+    /* Pipeline */
+    .pipeline{flex:1;overflow-y:auto;padding:20px;background:var(--bg);}
+    .pipeline-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--text-muted);gap:12px;}
+    .pipeline-empty .bi{font-size:2.5rem;opacity:0.3;}
+
+    /* Step cards */
+    .step-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;margin-bottom:0;position:relative;}
+    .step-card.running{border-color:var(--blue);}
+    .step-card.success{border-color:rgba(63,185,80,0.4);}
+    .step-card.error{border-color:rgba(248,81,73,0.4);}
+    .step-header{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:move;user-select:none;}
+    .step-num{width:22px;height:22px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:0.68rem;font-weight:700;flex-shrink:0;color:var(--text-muted);}
+    .step-icon{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:0.82rem;flex-shrink:0;}
+    .step-title{font-weight:600;font-size:0.85rem;flex:1;}
+    .step-badge{font-size:0.65rem;padding:2px 6px;border-radius:10px;font-weight:700;flex-shrink:0;}
+    .step-body{padding:0 14px 12px;}
+
+    /* Connector arrow between steps */
+    .step-connector{display:flex;align-items:center;justify-content:center;height:28px;position:relative;}
+    .step-connector::before{content:'';position:absolute;left:50%;top:0;width:2px;height:100%;background:var(--border);}
+    .step-connector-label{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:1px 8px;font-size:0.68rem;color:var(--text-muted);position:relative;z-index:1;}
+
+    /* Input bindings */
+    .binding-row{display:flex;align-items:center;gap:6px;margin-bottom:5px;font-size:0.78rem;}
+    .binding-name{color:var(--text-muted);min-width:90px;font-family:monospace;}
+    .binding-select{background:var(--surface2);border:1px solid var(--border);color:var(--text);border-radius:5px;padding:2px 6px;font-size:0.75rem;flex:1;}
+    .binding-select:focus{border-color:var(--blue);outline:none;}
+
+    /* Output chips */
+    .output-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+    .output-chip{font-size:0.68rem;padding:2px 8px;border-radius:10px;font-family:monospace;cursor:default;}
+    .output-chip.has-value{opacity:1;font-weight:600;}
+    .output-chip.no-value{opacity:0.4;}
+
+    /* Config form */
+    .step-config{background:var(--surface2);border-radius:6px;padding:10px 12px;margin-top:6px;}
+    .step-config .form-control,.step-config .form-select{background:var(--bg);border-color:var(--border);color:var(--text);font-size:0.78rem;padding:4px 8px;}
+    .step-config .form-label{font-size:0.72rem;color:var(--text-muted);margin-bottom:2px;}
+    .step-config-row{display:flex;gap:6px;align-items:flex-end;margin-bottom:6px;}
+    .step-config-row:last-child{margin-bottom:0;}
+
+    /* Result panel */
+    .step-result{margin-top:8px;font-size:0.78rem;}
+    .result-output-row{display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid rgba(48,54,61,0.5);}
+    .result-output-row:last-child{border-bottom:none;}
+    .result-key{font-family:monospace;color:var(--text-muted);min-width:80px;}
+    .result-val{font-family:monospace;color:var(--orange);word-break:break-all;flex:1;max-height:2.5em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;}
+    .result-val:hover{max-height:none;white-space:normal;}
+
+    /* Run log */
+    .run-log{background:var(--surface);border-top:1px solid var(--border);flex-shrink:0;max-height:180px;overflow-y:auto;}
+    .run-log-header{display:flex;align-items:center;justify-content:between;padding:8px 16px;border-bottom:1px solid var(--border);font-size:0.75rem;font-weight:600;gap:8px;}
+    .log-entry{padding:4px 16px;font-size:0.75rem;border-bottom:1px solid rgba(48,54,61,0.4);display:flex;gap:8px;align-items:baseline;}
+    .log-entry:last-child{border-bottom:none;}
+    .log-time{color:var(--text-muted);font-family:monospace;flex-shrink:0;}
+    .log-step{color:var(--blue);flex-shrink:0;}
+    .log-ok{color:var(--green);}
+    .log-err{color:var(--red);}
+
+    .btn-sm{padding:3px 8px;font-size:0.72rem;}
+    ::-webkit-scrollbar{width:5px;height:5px;}::-webkit-scrollbar-track{background:transparent;}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+  </style>
+</head>
+<body>
+
+<!-- Top bar -->
+<div class="topbar">
+  <a href="/home.html" class="btn btn-sm btn-outline-secondary"><i class="bi bi-house-fill"></i></a>
+  <div class="topbar-title"><i class="bi bi-diagram-3" style="color:var(--blue)"></i>Test Chain Builder</div>
+  <div class="ms-auto d-flex gap-2 align-items-center">
+    <span id="chainStatus" style="font-size:0.75rem;color:var(--text-muted)"></span>
+    <button class="btn btn-sm btn-outline-secondary" onclick="clearChain()"><i class="bi bi-trash me-1"></i>Clear</button>
+    <button class="btn btn-sm" style="background:var(--blue);color:#0d1117;font-weight:600;border:none" id="runBtn" onclick="runChain()">
+      <i class="bi bi-play-fill me-1"></i>Run Chain
+    </button>
+    <div id="navAuthArea"></div>
+  </div>
+</div>
+
+<div class="main-layout">
+
+  <!-- Left: Step Catalog -->
+  <div class="catalog">
+    <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:8px">Click or drag a step to add it to the chain.</div>
+
+    <div class="cat-header">Grant Flows</div>
+    <div class="catalog-item" onclick="addStep('auth-code')" draggable="true" ondragstart="onCatalogDrag(event,'auth-code')">
+      <div class="ci-icon" style="background:rgba(88,166,255,0.12);color:var(--blue)"><i class="bi bi-person-badge"></i></div>
+      <div><div class="ci-name">Auth Code + PKCE</div><div class="ci-desc">Human login via popup</div></div>
+    </div>
+    <div class="catalog-item" onclick="addStep('client-creds')" draggable="true" ondragstart="onCatalogDrag(event,'client-creds')">
+      <div class="ci-icon" style="background:rgba(61,203,122,0.1);color:var(--emerald)"><i class="bi bi-robot"></i></div>
+      <div><div class="ci-name">Client Credentials</div><div class="ci-desc">M2M service token</div></div>
+    </div>
+    <div class="catalog-item" onclick="addStep('saml-bearer')">
+      <div class="ci-icon" style="background:rgba(88,166,255,0.08);color:var(--blue)"><i class="bi bi-file-earmark-code"></i></div>
+      <div><div class="ci-name">SAML 2.0 Bearer</div><div class="ci-desc">Exchange SAML assertion</div></div>
+    </div>
+    <div class="catalog-item" onclick="addStep('pkjwt-token')">
+      <div class="ci-icon" style="background:rgba(188,140,255,0.1);color:var(--purple)"><i class="bi bi-key"></i></div>
+      <div><div class="ci-name">Private Key JWT</div><div class="ci-desc">No client secret required</div></div>
+    </div>
+    <div class="catalog-item" onclick="addStep('dpop-token')">
+      <div class="ci-icon" style="background:rgba(88,166,255,0.08);color:var(--blue)"><i class="bi bi-fingerprint"></i></div>
+      <div><div class="ci-name">DPoP Token</div><div class="ci-desc">Sender-constrained token</div></div>
+    </div>
+    <div class="catalog-item" onclick="addStep('ciba')">
+      <div class="ci-icon" style="background:rgba(45,217,198,0.1);color:var(--teal)"><i class="bi bi-phone-vibrate"></i></div>
+      <div><div class="ci-name">CIBA</div><div class="ci-desc">Push notification auth</div></div>
+    </div>
+
+    <div class="cat-header">Token Tools</div>
+    <div class="catalog-item" onclick="addStep('token-exchange')">
+      <div class="ci-icon" style="background:rgba(247,129,102,0.1);color:var(--coral)"><i class="bi bi-arrow-left-right"></i></div>
+      <div><div class="ci-name">Token Exchange</div><div class="ci-desc">RFC 8693 cross-app</div></div>
+    </div>
+    <div class="catalog-item" onclick="addStep('token-inspect')">
+      <div class="ci-icon" style="background:rgba(227,179,65,0.1);color:var(--amber)"><i class="bi bi-search"></i></div>
+      <div><div class="ci-name">Token Inspector</div><div class="ci-desc">RFC claim analysis</div></div>
+    </div>
+    <div class="catalog-item" onclick="addStep('token-revoke')">
+      <div class="ci-icon" style="background:rgba(248,81,73,0.1);color:var(--red)"><i class="bi bi-x-circle"></i></div>
+      <div><div class="ci-name">Token Revoke</div><div class="ci-desc">RFC 7009 + verify</div></div>
+    </div>
+  </div>
+
+  <!-- Right: Pipeline -->
+  <div class="pipeline" id="pipeline"
+    ondragover="event.preventDefault()"
+    ondrop="onPipelineDrop(event)">
+    <div class="pipeline-empty" id="pipelineEmpty">
+      <i class="bi bi-diagram-3"></i>
+      <div style="font-size:0.9rem;font-weight:600">Your chain is empty</div>
+      <div style="font-size:0.82rem">Click a step in the catalog to add it here</div>
+    </div>
+    <div id="pipelineSteps" style="max-width:700px;margin:0 auto"></div>
+  </div>
+
+</div>
+
+<!-- Run log -->
+<div class="run-log" id="runLog" style="display:none">
+  <div class="run-log-header">
+    <i class="bi bi-terminal" style="color:var(--text-muted)"></i>
+    <span>Run Log</span>
+    <button class="btn btn-sm btn-outline-secondary ms-auto" onclick="document.getElementById('runLog').style.display='none'">✕</button>
+  </div>
+  <div id="runLogEntries"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="common.js"></script>
+<script src="workflow.js"></script>
+</body>
+</html>

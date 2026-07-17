@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Okta OAuth Super Tester</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.css">
+  <style>
+    :root{--bg:#0d1117;--surface:#161b22;--surface2:#21262d;--border:#30363d;--text:#c9d1d9;--text-muted:#8b949e;--blue:#58a6ff;--green:#3fb950;--red:#f85149;--yellow:#d29922;--purple:#bc8cff;--orange:#ffa657;--teal:#2dd9c6;--coral:#f78166;--amber:#e3b341;--emerald:#3dcb7a;}
+    body{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,monospace;}
+    .hero{padding:48px 0 32px;text-align:center;}
+    .hero h1{font-size:1.8rem;font-weight:700;margin-bottom:8px;}
+    .hero p{color:var(--text-muted);font-size:0.9rem;}
+    .category-label{font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;font-weight:700;color:var(--text-muted);margin-bottom:12px;padding:0 4px;}
+    .tool-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;text-decoration:none;color:var(--text);transition:all 0.15s;display:block;height:100%;}
+    .tool-card:hover{border-color:var(--accent, var(--blue));background:var(--surface2);color:var(--text);transform:translateY(-1px);}
+    .tool-icon{font-size:1.3rem;margin-bottom:8px;}
+    .tool-name{font-size:0.875rem;font-weight:600;margin-bottom:3px;}
+    .tool-desc{font-size:0.72rem;color:var(--text-muted);line-height:1.4;}
+    .chain-cta{background:linear-gradient(135deg,rgba(88,166,255,0.1),rgba(45,217,198,0.08));border:1px solid rgba(88,166,255,0.25);border-radius:12px;padding:24px;text-align:center;text-decoration:none;display:block;color:var(--text);transition:all 0.2s;}
+    .chain-cta:hover{background:linear-gradient(135deg,rgba(88,166,255,0.15),rgba(45,217,198,0.12));color:var(--text);}
+    .chain-cta h3{font-size:1.1rem;font-weight:700;margin-bottom:6px;}
+    .chain-cta p{color:var(--text-muted);font-size:0.82rem;margin:0;}
+    ::-webkit-scrollbar{width:6px;height:6px;}
+    ::-webkit-scrollbar-track{background:transparent;}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-dark sticky-top" style="background:var(--surface);border-bottom:1px solid var(--border);">
+  <div class="container-fluid px-4">
+    <span class="navbar-brand" style="font-weight:700"><i class="bi bi-lightning-charge-fill me-2" style="color:var(--blue)"></i>Okta OAuth Super Tester</span>
+    <a href="/settings.html" class="btn btn-sm btn-outline-secondary"><i class="bi bi-gear-fill me-1"></i>Settings</a>
+  </div>
+</nav>
+
+<div class="container py-5" style="max-width:1100px">
+  <div class="hero">
+    <h1>⚡ Okta OAuth Super Tester</h1>
+    <p>A local dev tool for testing every Okta grant flow, inspecting tokens, and managing your tenant via API.</p>
+  </div>
+
+  <!-- Chain CTA -->
+  <div class="mb-5">
+    <a href="/workflow.html" class="chain-cta">
+      <div style="font-size:2rem;margin-bottom:8px">⛓️</div>
+      <h3>Build a Test Chain</h3>
+      <p>Chain multiple tests together — Auth Code → Token Inspector → Token Exchange — with automatic output-to-input binding. Run the full flow in one click.</p>
+    </a>
+  </div>
+
+  <div class="row g-5">
+
+    <!-- Grant Flows -->
+    <div class="col-lg-6">
+      <div class="category-label">🔑 Grant Flows</div>
+      <div class="row g-2">
+        <div class="col-6"><a href="/authcode.html" class="tool-card" style="--accent:var(--blue)">
+          <div class="tool-icon" style="color:var(--blue)"><i class="bi bi-person-badge"></i></div>
+          <div class="tool-name">Auth Code + PKCE</div>
+          <div class="tool-desc">Human authentication — real user login via authorization_code + PKCE</div>
+        </a></div>
+        <div class="col-6"><a href="/client-creds.html" class="tool-card" style="--accent:var(--emerald)">
+          <div class="tool-icon" style="color:var(--emerald)"><i class="bi bi-robot"></i></div>
+          <div class="tool-name">Client Credentials</div>
+          <div class="tool-desc">M2M token — service-to-service, no user involved</div>
+        </a></div>
+        <div class="col-6"><a href="/" class="tool-card" style="--accent:var(--blue)">
+          <div class="tool-icon" style="color:var(--blue)"><i class="bi bi-file-earmark-code"></i></div>
+          <div class="tool-name">SAML 2.0 Bearer</div>
+          <div class="tool-desc">Exchange a signed SAML assertion for OAuth tokens</div>
+        </a></div>
+        <div class="col-6"><a href="/dpop.html" class="tool-card" style="--accent:var(--blue)">
+          <div class="tool-icon" style="color:var(--blue)"><i class="bi bi-fingerprint"></i></div>
+          <div class="tool-name">DPoP</div>
+          <div class="tool-desc">Sender-constrained tokens — RFC 9449 proof of possession</div>
+        </a></div>
+        <div class="col-6"><a href="/pkjwt.html" class="tool-card" style="--accent:var(--purple)">
+          <div class="tool-icon" style="color:var(--purple)"><i class="bi bi-key"></i></div>
+          <div class="tool-name">Private Key JWT</div>
+          <div class="tool-desc">PKJWT client auth — no client secret required</div>
+        </a></div>
+        <div class="col-6"><a href="/ciba.html" class="tool-card" style="--accent:var(--teal)">
+          <div class="tool-icon" style="color:var(--teal)"><i class="bi bi-phone-vibrate"></i></div>
+          <div class="tool-name">CIBA</div>
+          <div class="tool-desc">Backchannel — push notification to user's device</div>
+        </a></div>
+        <div class="col-6"><a href="/token-exchange.html" class="tool-card" style="--accent:var(--coral)">
+          <div class="tool-icon" style="color:var(--coral)"><i class="bi bi-arrow-left-right"></i></div>
+          <div class="tool-name">Token Exchange</div>
+          <div class="tool-desc">RFC 8693 cross-app token exchange (delegation)</div>
+        </a></div>
+      </div>
+    </div>
+
+    <!-- Token Tools + Admin -->
+    <div class="col-lg-6">
+      <div class="category-label">🔍 Token Tools</div>
+      <div class="row g-2 mb-4">
+        <div class="col-6"><a href="/token-inspector.html" class="tool-card" style="--accent:var(--amber)">
+          <div class="tool-icon" style="color:var(--amber)"><i class="bi bi-search"></i></div>
+          <div class="tool-name">Token Inspector</div>
+          <div class="tool-desc">RFC-annotated claim analysis, revocation + lifetime policies</div>
+        </a></div>
+      </div>
+
+      <div class="category-label">🛠️ Administration</div>
+      <div class="row g-2 mb-4">
+        <div class="col-6"><a href="/admin.html" class="tool-card" style="--accent:var(--emerald)">
+          <div class="tool-icon" style="color:var(--emerald)"><i class="bi bi-gear-wide-connected"></i></div>
+          <div class="tool-name">Admin API</div>
+          <div class="tool-desc">App lifecycle, MFA management, audit log, Terraform export</div>
+        </a></div>
+      </div>
+
+      <div class="category-label">⚙️ Configuration</div>
+      <div class="row g-2">
+        <div class="col-6"><a href="/settings.html" class="tool-card" style="--accent:var(--text-muted)">
+          <div class="tool-icon" style="color:var(--text-muted)"><i class="bi bi-sliders"></i></div>
+          <div class="tool-name">Settings</div>
+          <div class="tool-desc">Global Okta config, admin token, app signing key, authentication</div>
+        </a></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

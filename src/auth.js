@@ -25,8 +25,8 @@ function logoutEndpoint(cfg) {
 }
 
 // Paths that bypass auth even when authEnabled = true
-const FREE_PATHS = new Set(['/settings.html', '/settings.js', '/common.js', '/favicon.ico', '/auth/jwks']);
-const FREE_PREFIXES = ['/auth/', '/api/auth/', '/api/settings'];
+const FREE_PATHS = new Set(['/settings.html', '/settings.js', '/common.js', '/favicon.ico', '/auth/jwks', '/oauth/callback', '/home.html']);
+const FREE_PREFIXES = ['/auth/', '/api/auth/', '/api/settings', '/api/oauth/'];
 
 function requireAuth(req, res, next) {
   const cfg = getConfig();
