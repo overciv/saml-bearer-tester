@@ -284,11 +284,12 @@ const CLAIM_META = {
   act:  { std:'RFC 8693', type:'native',       desc:'Actor — identifies the party acting on behalf of the subject (delegation chain).' },
 };
 
+// All inline styles — no CSS class dependencies so this works in every page / modal
 const TYPE_HTML = {
-  native:       '<span class="type-native">● native</span>',
-  configurable: '<span class="type-configurable">◐ configurable</span>',
-  mappable:     '<span class="type-mappable">○ mappable</span>',
-  custom:       '<span class="type-custom">✦ custom</span>',
+  native:       '<span style="background:rgba(63,185,80,0.12);color:var(--green,#3fb950);border:1px solid rgba(63,185,80,0.25);border-radius:4px;padding:1px 7px;font-size:0.68rem;font-weight:700;white-space:nowrap">● native</span>',
+  configurable: '<span style="background:rgba(88,166,255,0.1);color:var(--blue,#58a6ff);border:1px solid rgba(88,166,255,0.25);border-radius:4px;padding:1px 7px;font-size:0.68rem;font-weight:700;white-space:nowrap">◐ configurable</span>',
+  mappable:     '<span style="background:rgba(188,140,255,0.1);color:var(--purple,#bc8cff);border:1px solid rgba(188,140,255,0.25);border-radius:4px;padding:1px 7px;font-size:0.68rem;font-weight:700;white-space:nowrap">○ mappable</span>',
+  custom:       '<span style="background:rgba(255,166,87,0.1);color:var(--orange,#ffa657);border:1px solid rgba(255,166,87,0.25);border-radius:4px;padding:1px 7px;font-size:0.68rem;font-weight:700;white-space:nowrap">✦ custom</span>',
 };
 
 function formatClaimValue(key, val) {
@@ -310,55 +311,78 @@ function formatClaimValue(key, val) {
   return escHtml(s.length > 80 ? s.slice(0,80) + '…' : s);
 }
 
-// Renders the full RFC-annotated claims table — used by both standalone Token Inspector
-// and the workflow chain modal so they show IDENTICAL content.
+// Renders the full RFC-annotated claims table — 100% inline styles so it works
+// identically in both the standalone Token Inspector page AND the workflow modal
+// (no CSS class dependencies from any specific page).
 function renderClaimsTable(payload) {
   if (!payload) return '<div style="color:var(--text-muted,#8b949e)">No payload to display</div>';
   const known   = Object.keys(CLAIM_META).filter(k => payload[k] !== undefined);
   const unknown = Object.keys(payload).filter(k => !CLAIM_META[k]);
 
+  const TD  = 'padding:6px 10px;border-bottom:1px solid rgba(48,54,61,0.5);vertical-align:top';
   const rows = [...known, ...unknown].map(k => {
     const meta     = CLAIM_META[k];
     const typeHtml = meta ? TYPE_HTML[meta.type] : TYPE_HTML.custom;
-    const std      = meta ? `<span class="claim-std">${escHtml(meta.std)}</span>` : '<span class="claim-std" style="opacity:0.5">Custom</span>';
-    const desc     = meta ? escHtml(meta.desc) : '<span style="color:var(--text-muted,#8b949e)">User-defined custom claim</span>';
-    return `<tr>
-      <td><span class="claim-name">${escHtml(k)}</span></td>
-      <td><span class="claim-val">${formatClaimValue(k, payload[k])}</span></td>
-      <td>${std}</td>
-      <td>${typeHtml}</td>
-      <td class="claim-desc">${desc}</td>
+    const std      = meta
+      ? `<span style="font-size:0.7rem;color:var(--blue,#58a6ff);font-family:monospace">${escHtml(meta.std)}</span>`
+      : '<span style="font-size:0.7rem;color:var(--text-muted,#8b949e);font-style:italic">Custom</span>';
+    const desc = meta
+      ? `<span style="font-size:0.75rem;color:var(--text-muted,#8b949e);line-height:1.45">${escHtml(meta.desc)}</span>`
+      : '<span style="font-size:0.75rem;color:var(--text-muted,#8b949e);font-style:italic">User-defined custom claim</span>';
+    return `<tr style="background:transparent">
+      <td style="${TD};font-family:monospace;font-weight:700;color:var(--amber,#e3b341);white-space:nowrap;font-size:0.8rem">${escHtml(k)}</td>
+      <td style="${TD};font-family:monospace;font-size:0.76rem;word-break:break-all;overflow-wrap:anywhere">${formatClaimValue(k, payload[k])}</td>
+      <td style="${TD};white-space:nowrap">${std}</td>
+      <td style="${TD};white-space:nowrap">${typeHtml}</td>
+      <td style="${TD}">${desc}</td>
     </tr>`;
   }).join('');
 
-  return `<table class="claims-table">
-    <thead><tr>
-      <th>Claim</th><th>Value</th><th>Standard</th><th>Type</th><th>Description</th>
-    </tr></thead>
-    <tbody>${rows}</tbody>
-  </table>`;
+  const TH = 'padding:7px 10px;text-align:left;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted,#8b949e);font-weight:600';
+  return `<div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:0.8rem;table-layout:fixed">
+      <colgroup>
+        <col style="width:80px">
+        <col style="width:185px">
+        <col style="width:92px">
+        <col style="width:115px">
+        <col>
+      </colgroup>
+      <thead style="background:var(--surface2,#21262d);position:sticky;top:0"><tr>
+        <th style="${TH}">Claim</th>
+        <th style="${TH}">Value</th>
+        <th style="${TH}">Standard</th>
+        <th style="${TH}">Type</th>
+        <th style="${TH}">Description</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
 }
 
-// Renders the token type summary badges (identical to standalone page header)
+// Renders the token type summary badges — 100% inline styles, no page-specific CSS classes.
 function renderTokenBadges(decoded) {
   const p = decoded.payload, h = decoded.header;
-  const isId = h.typ === 'JWT' && (p.nonce !== undefined || p.at_hash !== undefined || p.c_hash !== undefined);
+  const isId      = h.typ === 'JWT' && (p.nonce !== undefined || p.at_hash !== undefined || p.c_hash !== undefined);
   const isMachine = !p.uid;
-  const hasDpop = !!p.cnf?.jkt;
-  const hasAct  = !!p.act;
+  const hasDpop   = !!p.cnf?.jkt;
+  const hasAct    = !!p.act;
 
+  const BADGE = 'display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:20px;font-size:0.75rem;font-weight:600';
   const typeBadge = isId
-    ? '<span class="token-type-badge badge-id"><i class="bi bi-person-badge me-1"></i>ID Token</span>'
+    ? `<span style="${BADGE};background:rgba(188,140,255,0.1);color:var(--purple,#bc8cff);border:1px solid rgba(188,140,255,0.3)"><i class="bi bi-person-badge"></i> ID Token</span>`
     : isMachine
-      ? '<span class="token-type-badge badge-machine"><i class="bi bi-robot me-1"></i>Machine Token (M2M)</span>'
-      : '<span class="token-type-badge badge-user"><i class="bi bi-person me-1"></i>User Token</span>';
-  const dpopBadge = hasDpop ? '<span class="token-type-badge" style="background:rgba(45,217,198,0.1);color:var(--teal,#2dd9c6);border:1px solid rgba(45,217,198,0.25)"><i class="bi bi-fingerprint me-1"></i>DPoP-bound</span>' : '';
-  const actBadge  = hasAct  ? '<span class="token-type-badge" style="background:rgba(247,129,102,0.1);color:#f78166;border:1px solid rgba(247,129,102,0.25)"><i class="bi bi-people me-1"></i>Delegation</span>' : '';
+      ? `<span style="${BADGE};background:rgba(63,185,80,0.1);color:var(--green,#3fb950);border:1px solid rgba(63,185,80,0.3)"><i class="bi bi-robot"></i> Machine Token (M2M)</span>`
+      : `<span style="${BADGE};background:rgba(88,166,255,0.12);color:var(--blue,#58a6ff);border:1px solid rgba(88,166,255,0.3)"><i class="bi bi-person"></i> User Token</span>`;
+  const dpopBadge = hasDpop ? `<span style="${BADGE};background:rgba(45,217,198,0.1);color:var(--teal,#2dd9c6);border:1px solid rgba(45,217,198,0.25)"><i class="bi bi-fingerprint"></i> DPoP-bound</span>` : '';
+  const actBadge  = hasAct  ? `<span style="${BADGE};background:rgba(247,129,102,0.1);color:#f78166;border:1px solid rgba(247,129,102,0.25)"><i class="bi bi-people"></i> Delegation</span>` : '';
   const exp = p.exp ? new Date(p.exp * 1000) : null;
   const expired = exp && exp < new Date();
-  const expBadge = exp ? `<span class="status-badge ${expired?'status-err':'status-ok'}">${expired?'⚠ Expired':'✓ Valid'} · ${exp.toLocaleString()}</span>` : '';
+  const expBadge = exp
+    ? `<span style="font-size:0.7rem;padding:2px 8px;border-radius:10px;font-weight:700;${expired?'background:rgba(248,81,73,0.15);color:#f85149;border:1px solid rgba(248,81,73,0.3)':'background:rgba(63,185,80,0.15);color:#3fb950;border:1px solid rgba(63,185,80,0.3)'}">${expired?'⚠ Expired':'✓ Valid'} · ${exp.toLocaleString()}</span>`
+    : '';
 
-  return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+  return `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid rgba(48,54,61,0.5)">
     ${typeBadge}${dpopBadge}${actBadge}${expBadge}
     <span style="font-size:0.78rem;color:var(--text-muted,#8b949e);margin-left:auto">alg: <code>${escHtml(h.alg||'—')}</code></span>
   </div>`;
