@@ -10,7 +10,7 @@ const { generatePkjwtKeyPair, generateClientAssertion, validateClientAssertion }
 const { backchannelAuthorize, pollToken } = require('./src/ciba');
 const { exchange: tokenExchange } = require('./src/token-exchange');
 const { revokeAndVerify, getTokenLifetime } = require('./src/token-inspector');
-const { startFlow, handleCallback, getFlowStatus, clientCredentials } = require('./src/auth-code');
+const { startFlow, handleCallback, getFlowStatus, clientCredentials, resourceOwnerPassword } = require('./src/auth-code');
 const { createApp, getApp, cloneApp, findUser, listFactors, resetFactor, getSystemLog, assignAppOwner, deleteApp, factorChallenge, factorPoll } = require('./src/admin-api');
 const { getConfig, saveConfig, getSigningKey, generateSigningKey, getPublicJwks, getPublicConfig } = require('./src/config');
 const { requireAuth, loginHandler, callbackHandler, logoutHandler, meHandler } = require('./src/auth');
@@ -238,6 +238,11 @@ app.get('/api/oauth/status/:flowId', (req, res) => {
 
 app.post('/api/oauth/client-creds', async (req, res) => {
   try { res.json(await clientCredentials(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/oauth/ropc', async (req, res) => {
+  try { res.json(await resourceOwnerPassword(req.body)); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 

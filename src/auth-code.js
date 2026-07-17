@@ -125,4 +125,23 @@ async function clientCredentials({ oktaDomain, authServerId, clientId, clientSec
   }
 }
 
-module.exports = { startFlow, handleCallback, getFlowStatus, clientCredentials };
+async function resourceOwnerPassword({ oktaDomain, authServerId, clientId, clientSecret, username, password, scope }) {
+  const ep     = _tokenEp(oktaDomain, authServerId);
+  const scopes = Array.isArray(scope) ? scope.join(' ') : (scope || 'openid');
+  const params = new URLSearchParams({ grant_type: 'password', username, password, scope: scopes });
+  const t0 = Date.now();
+  try {
+    const r = await axios.post(ep, params.toString(), {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`
+      },
+      validateStatus: () => true
+    });
+    return { success: r.status < 300 && !r.data?.error, statusCode: r.status, durationMs: Date.now() - t0, tokenEndpoint: ep, response: r.data };
+  } catch (e) {
+    return { success: false, statusCode: 0, durationMs: Date.now() - t0, tokenEndpoint: ep, error: e.message };
+  }
+}
+
+module.exports = { startFlow, handleCallback, getFlowStatus, clientCredentials, resourceOwnerPassword };

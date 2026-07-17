@@ -52,6 +52,18 @@ const STEP_DEFS = {
       {k:'scope',       label:'Scope',         type:'text', ph:'openid'},
     ]
   },
+  'ropc': {
+    label:'ROPC (Resource Owner Password)', icon:'bi-person-lock', color:'var(--orange)',
+    bg:'rgba(255,166,87,0.1)',
+    inputs:[], outputs:['access_token','id_token','refresh_token'],
+    configFields:[
+      {k:'clientId',    label:'Client ID',     type:'text'},
+      {k:'clientSecret',label:'Client Secret', type:'password'},
+      {k:'username',    label:'Username',      type:'email',    ph:'user@example.com'},
+      {k:'password',    label:'Password',      type:'password'},
+      {k:'scope',       label:'Scope',         type:'text',     ph:'openid profile email'},
+    ]
+  },
   'ciba': {
     label:'CIBA', icon:'bi-phone-vibrate', color:'var(--teal)',
     bg:'rgba(45,217,198,0.1)',
@@ -517,6 +529,19 @@ async function executeStep(step, inputs, domain, sid) {
           scope:(c.scope||'openid').split(/\s+/), grantType:'client_credentials', privateJwk:kp.privateJwk, publicJwk:kp.publicJwk })
       }).then(r=>r.json());
       return { success:r.success, outputs:{ access_token:r.response?.access_token }, error:!r.success?(r.response?.error||`HTTP ${r.statusCode}`):null };
+    }
+
+    case 'ropc': {
+      const r = await fetch('/api/oauth/ropc', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid,
+          clientId:c.clientId, clientSecret:c.clientSecret,
+          username:c.username, password:c.password,
+          scope:(c.scope||'openid').split(/\s+/) })
+      }).then(r=>r.json());
+      return { success:r.success,
+        outputs:{ access_token:r.response?.access_token, id_token:r.response?.id_token, refresh_token:r.response?.refresh_token },
+        error:!r.success?(r.response?.error_description||r.response?.error||`HTTP ${r.statusCode}`):null };
     }
 
     case 'mfa-list-factors': {
