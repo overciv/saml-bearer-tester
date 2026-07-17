@@ -51,7 +51,7 @@
       <button class="nav-pill${hasActive ? ' act' : ''} dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
         ${icon} ${esc(label)}
       </button>
-      <ul class="dropdown-menu dropdown-menu-dark nav-dd">
+      <ul class="dropdown-menu nav-dd">
         ${ids.map(ddItem).join('')}
       </ul>
     </div>`;
@@ -86,9 +86,8 @@
   // ─── CSS ──────────────────────────────────────────────────────────────────────
 
   const CSS = `
-.app-nav{background:var(--surface,#161b22);border-bottom:1px solid var(--border,#30363d);position:sticky;top:0;z-index:1020}
-.nav-inner{display:flex;align-items:center;gap:4px;padding:7px 14px;overflow-x:auto}
-.nav-inner::-webkit-scrollbar{height:0}
+.app-nav{background:var(--surface,#161b22);border-bottom:1px solid var(--border,#30363d);position:sticky;top:0;z-index:1020;overflow:visible}
+.nav-inner{display:flex;align-items:center;gap:4px;padding:7px 14px;overflow:visible;flex-wrap:wrap}
 .nav-brand{font-weight:700;font-size:0.95rem;color:var(--text,#c9d1d9)!important;text-decoration:none;display:flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0;margin-right:2px}
 .nav-sep{width:1px;height:18px;background:var(--border,#30363d);flex-shrink:0;margin:0 4px}
 
