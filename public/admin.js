@@ -575,24 +575,249 @@ async function refreshFactors() {
   }
 }
 
+// ─── Factor metadata ──────────────────────────────────────────────────────────
+
+const FACTOR_META = {
+  'push':                { label:'Okta Verify Push',      icon:'bi-phone-vibrate',   challengeMode:'push'  },
+  'token:software:totp': { label:'TOTP Authenticator',    icon:'bi-phone',           challengeMode:'totp'  },
+  'token:hardware':      { label:'Hardware Token',        icon:'bi-usb-symbol',      challengeMode:'totp'  },
+  'email':               { label:'Email OTP',             icon:'bi-envelope',        challengeMode:'otp'   },
+  'token:software:sms':  { label:'SMS OTP',               icon:'bi-chat-text',       challengeMode:'otp'   },
+  'call':                { label:'Voice Call OTP',        icon:'bi-telephone',       challengeMode:'otp'   },
+  'webauthn':            { label:'WebAuthn / FIDO2',      icon:'bi-fingerprint',     challengeMode:null    },
+  'question':            { label:'Security Question',     icon:'bi-question-circle', challengeMode:null    },
+  'signed_nonce':        { label:'Okta FastPass',         icon:'bi-lightning',       challengeMode:null    },
+  'password':            { label:'Password',              icon:'bi-key',             challengeMode:null    },
+};
+
+function _factorIdentifier(f) {
+  const p = f.profile || {};
+  switch (f.factorType) {
+    case 'push':                return p.name || p.credentialId || '—';
+    case 'email':               return p.email || '—';
+    case 'token:software:sms':  return p.phoneNumber || '—';
+    case 'call':                return p.phoneNumber || '—';
+    case 'token:software:totp': return p.credentialId || '—';
+    case 'token:hardware':      return p.credentialId || p.tokenType || '—';
+    case 'webauthn':            return p.authenticatorName || (p.credentialId ? p.credentialId.slice(0,20)+'…' : '—');
+    case 'question':            return p.questionText || p.question || '—';
+    case 'signed_nonce':        return p.name || p.credentialId || '—';
+    default:                    return p.credentialId || p.email || p.phoneNumber || '—';
+  }
+}
+
+function _factorDescription(f) {
+  const p = f.profile || {};
+  switch (f.factorType) {
+    case 'push':                return [p.platform, p.deviceType, p.version].filter(Boolean).join(' · ') || 'Mobile push notification';
+    case 'email':               return 'One-time passcode sent to email address';
+    case 'token:software:sms':  return 'One-time passcode sent via SMS';
+    case 'call':                return 'One-time passcode delivered via voice call';
+    case 'token:software:totp': return `${f.provider} authenticator app (RFC 6238 TOTP)`;
+    case 'token:hardware':      return `${f.vendorName || f.provider} hardware token`;
+    case 'webauthn':            return `${f.provider} — requires browser WebAuthn API`;
+    case 'question':            return 'Shared secret security question';
+    case 'signed_nonce':        return 'Device-bound biometric / FastPass';
+    default:                    return f.factorType?.replace(/[:_]/g,' ') || '—';
+  }
+}
+
+// Stored for challenge use
+let _factorCache = [];
+
 function renderFactors(factors) {
+  _factorCache = factors;
+  document.getElementById('challengePanel').style.display = 'none';
   const tbody = document.getElementById('factorTableBody');
   if (!factors.length) {
-    tbody.innerHTML = '<tr><td colspan="5" style="color:var(--text-muted);text-align:center;padding:20px">No factors enrolled</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;padding:20px">No factors enrolled</td></tr>';
     return;
   }
-  const factorLabels = { token_software_totp:'TOTP (Authenticator)', token_hardware:'Hardware (YubiKey)', push:'Push (Okta Verify)', signed_nonce:'Signed Nonce', question:'Security Question', email:'Email OTP', sms:'SMS', call:'Voice Call', webauthn:'WebAuthn / FIDO2', password:'Password' };
-  tbody.innerHTML = factors.map(f => `<tr>
-    <td><strong>${escHtml(factorLabels[f.factorType] || f.factorType)}</strong></td>
-    <td style="color:var(--text-muted);font-size:0.75rem">${escHtml(f.provider)}</td>
-    <td><span class="${f.status === 'ACTIVE' ? 'factor-status-active' : 'factor-status-inactive'}">${escHtml(f.status)}</span></td>
-    <td style="color:var(--text-muted);font-size:0.75rem">${f.created ? new Date(f.created).toLocaleDateString() : '—'}</td>
-    <td>
-      <button class="btn btn-outline-secondary btn-sm" style="color:var(--red);border-color:var(--red);font-size:0.72rem" onclick="resetFactor('${escHtml(f.id)}','${escHtml(factorLabels[f.factorType]||f.factorType)}')">
-        <i class="bi bi-trash me-1"></i>Reset
-      </button>
-    </td>
-  </tr>`).join('');
+
+  tbody.innerHTML = factors.map(f => {
+    const meta       = FACTOR_META[f.factorType] || { label: f.factorType, icon:'bi-shield', challengeMode:null };
+    const identifier = _factorIdentifier(f);
+    const desc       = _factorDescription(f);
+    const canChallenge = meta.challengeMode !== null && f.status === 'ACTIVE';
+    const challengeLabel = { push:'Send Push', otp:'Send OTP', totp:'Verify OTP' }[meta.challengeMode] || 'Challenge';
+    const challengeIcon  = { push:'bi-phone-vibrate', otp:'bi-send', totp:'bi-key' }[meta.challengeMode] || 'bi-play';
+
+    return `<tr>
+      <td>
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi ${meta.icon}" style="color:var(--emerald);flex-shrink:0"></i>
+          <div>
+            <div style="font-weight:600;font-size:0.82rem">${escHtml(meta.label)}</div>
+            <div style="font-size:0.7rem;color:var(--text-muted)">${escHtml(f.provider)}</div>
+          </div>
+        </div>
+      </td>
+      <td style="font-family:monospace;font-size:0.78rem;color:var(--orange)">${escHtml(identifier)}</td>
+      <td style="font-size:0.75rem;color:var(--text-muted);max-width:180px">${escHtml(desc)}</td>
+      <td><span class="${f.status === 'ACTIVE' ? 'factor-status-active' : 'factor-status-inactive'}">${escHtml(f.status)}</span></td>
+      <td style="color:var(--text-muted);font-size:0.72rem;white-space:nowrap">${f.created ? new Date(f.created).toLocaleDateString() : '—'}</td>
+      <td>
+        <div class="d-flex gap-1 flex-wrap">
+          ${canChallenge ? `<button class="btn btn-outline-secondary btn-sm" style="color:var(--emerald);border-color:rgba(61,203,122,0.4);font-size:0.72rem"
+            onclick="startChallenge('${escHtml(f.id)}')">
+            <i class="bi ${challengeIcon} me-1"></i>${challengeLabel}
+          </button>` : meta.challengeMode === null && f.status === 'ACTIVE' ? `<span style="font-size:0.7rem;color:var(--text-muted);font-style:italic">challenge N/A</span>` : ''}
+          <button class="btn btn-outline-secondary btn-sm" style="color:var(--red);border-color:var(--red);font-size:0.72rem"
+            onclick="resetFactor('${escHtml(f.id)}','${escHtml(meta.label)}')">
+            <i class="bi bi-trash me-1"></i>Reset
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── MFA Challenge ────────────────────────────────────────────────────────────
+
+let _challengeState = { factorId: null, pollHref: null, pollTimer: null, attempts: 0 };
+
+function _factor(id) { return _factorCache.find(f => f.id === id) || {}; }
+
+async function startChallenge(factorId) {
+  const f    = _factor(factorId);
+  const meta = FACTOR_META[f.factorType] || {};
+  cancelChallenge(true); // reset any previous state
+
+  _challengeState.factorId = factorId;
+  const panel = document.getElementById('challengePanel');
+  panel.style.display = '';
+  document.getElementById('challengeTitle').textContent =
+    `${meta.label || f.factorType} Challenge — ${_factorIdentifier(f)}`;
+  document.getElementById('challengeFactorIdLabel').textContent = factorId;
+  ['challengePushState','challengeOtpState','challengeTotpState','challengeResultState'].forEach(id =>
+    document.getElementById(id).style.display = 'none');
+
+  panel.scrollIntoView({ behavior:'smooth', block:'nearest' });
+
+  if (meta.challengeMode === 'totp') {
+    // No server-side challenge needed — show input directly
+    document.getElementById('challengeTotpState').style.display = '';
+    document.getElementById('totpInput').value = '';
+    document.getElementById('totpInput').focus();
+    return;
+  }
+
+  // For push, otp: trigger challenge on server
+  try {
+    const res = await fetch('/api/admin/factor-challenge', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(adminParams({ userId: currentUserId, factorId }))
+    }).then(r => r.json());
+
+    if (!res.success && !res.factorResult) {
+      showChallengeResult('error', `Challenge failed: ${escHtml(res.error || `HTTP ${res.statusCode}`)}`);
+      return;
+    }
+
+    if (meta.challengeMode === 'push') {
+      _challengeState.pollHref = res.pollHref;
+      document.getElementById('challengePushState').style.display = '';
+      _startPushPoll();
+    } else {
+      // OTP: challenge sent (SMS/Email), show input
+      const hint = f.factorType === 'email'
+        ? `OTP sent to <strong>${escHtml(_factorIdentifier(f))}</strong> — enter the code below:`
+        : `OTP sent to <strong>${escHtml(_factorIdentifier(f))}</strong> — enter the code below:`;
+      document.getElementById('otpHint').innerHTML = hint;
+      document.getElementById('challengeOtpState').style.display = '';
+      document.getElementById('otpInput').value = '';
+      document.getElementById('otpInput').focus();
+    }
+  } catch (e) {
+    showChallengeResult('error', 'Error: ' + escHtml(e.message));
+  }
+}
+
+function _startPushPoll() {
+  _challengeState.attempts = 0;
+  const MAX = 20; // 20 × 3s = 60s
+  _challengeState.pollTimer = setInterval(async () => {
+    _challengeState.attempts++;
+    document.getElementById('pushMeta').textContent =
+      `Attempt ${_challengeState.attempts}/${MAX} · ${(MAX - _challengeState.attempts) * 3}s remaining`;
+
+    if (_challengeState.attempts >= MAX) {
+      clearInterval(_challengeState.pollTimer);
+      showChallengeResult('timeout', '⌛ Push notification timed out — no response within 60 seconds');
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/admin/factor-poll', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(adminParams({ pollHref: _challengeState.pollHref }))
+      }).then(r => r.json());
+
+      const result = res.factorResult;
+      if (result === 'WAITING') return; // keep polling
+      clearInterval(_challengeState.pollTimer);
+      if (result === 'SUCCESS')  showChallengeResult('success', '✅ Push approved — challenge SUCCEEDED');
+      else if (result === 'REJECTED') showChallengeResult('denied',  '❌ Push rejected — user denied the notification');
+      else if (result === 'TIMEOUT')  showChallengeResult('timeout', '⌛ Push timed out — no response from device');
+      else showChallengeResult('error', `Challenge ended with result: ${escHtml(result || 'unknown')}`);
+    } catch {}
+  }, 3000);
+}
+
+async function verifyOtp() {
+  const btn  = document.getElementById('verifyOtpBtn');
+  const code = document.getElementById('otpInput').value.trim();
+  if (!code) { toast('Enter the OTP code first', 'warning'); return; }
+  setLoading(btn, true, '<i class="bi bi-check-circle me-1"></i>Verifying…');
+  await _doVerify(code);
+  setLoading(btn, false, '<i class="bi bi-check-circle me-1"></i>Verify');
+}
+
+async function verifyTotp() {
+  const btn  = document.getElementById('verifyTotpBtn');
+  const code = document.getElementById('totpInput').value.trim();
+  if (!code) { toast('Enter the OTP code first', 'warning'); return; }
+  setLoading(btn, true, '<i class="bi bi-check-circle me-1"></i>Verifying…');
+  await _doVerify(code);
+  setLoading(btn, false, '<i class="bi bi-check-circle me-1"></i>Verify');
+}
+
+async function _doVerify(passCode) {
+  document.getElementById('challengeOtpState').style.display = 'none';
+  document.getElementById('challengeTotpState').style.display = 'none';
+  try {
+    const res = await fetch('/api/admin/factor-challenge', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(adminParams({ userId: currentUserId, factorId: _challengeState.factorId, passCode }))
+    }).then(r => r.json());
+
+    if (res.factorResult === 'SUCCESS' || res.success) {
+      showChallengeResult('success', '✅ Challenge SUCCEEDED — OTP is valid');
+    } else {
+      const err = res.response?.errorSummary || res.error || res.factorResult || `HTTP ${res.statusCode}`;
+      showChallengeResult('denied', `❌ Challenge FAILED — ${escHtml(err)}`);
+    }
+  } catch (e) {
+    showChallengeResult('error', 'Error: ' + escHtml(e.message));
+  }
+}
+
+function showChallengeResult(type, html) {
+  ['challengePushState','challengeOtpState','challengeTotpState'].forEach(id =>
+    document.getElementById(id).style.display = 'none');
+  const resultEl = document.getElementById('challengeResultState');
+  const textEl   = document.getElementById('challengeResultText');
+  resultEl.style.display = '';
+  const colors = { success:'var(--green)', denied:'var(--red)', timeout:'var(--yellow)', error:'var(--red)' };
+  textEl.style.color = colors[type] || 'var(--text)';
+  textEl.innerHTML = html;
+}
+
+function cancelChallenge(silent = false) {
+  if (_challengeState.pollTimer) { clearInterval(_challengeState.pollTimer); _challengeState.pollTimer = null; }
+  _challengeState = { factorId: null, pollHref: null, pollTimer: null, attempts: 0 };
+  document.getElementById('challengePanel').style.display = 'none';
+  if (!silent) toast('Challenge cancelled', 'info');
 }
 
 async function resetFactor(factorId, label) {

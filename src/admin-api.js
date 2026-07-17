@@ -137,6 +137,34 @@ async function getSystemLog({ oktaDomain, adminApiToken, since, until, limit = 2
   } catch (e) { return { success: false, statusCode: 0, error: e.message }; }
 }
 
+async function factorChallenge({ oktaDomain, adminApiToken, userId, factorId, passCode }) {
+  const url  = `https://${oktaDomain}/api/v1/users/${userId}/factors/${factorId}/verify`;
+  const body = passCode ? { passCode } : {};
+  const hdrs = { ...plain(adminApiToken), 'Content-Type': 'application/json' };
+  const t0   = Date.now();
+  try {
+    const r = await axios.post(url, body, { headers: hdrs, validateStatus: () => true });
+    const result = r.data?.factorResult;
+    return {
+      success:      r.status === 200 && (result === 'SUCCESS' || result === 'WAITING'),
+      statusCode:   r.status,
+      durationMs:   Date.now() - t0,
+      factorResult: result,
+      pollHref:     r.data?._links?.poll?.href,
+      response:     r.data
+    };
+  } catch (e) { return { success: false, statusCode: 0, error: e.message }; }
+}
+
+async function factorPoll({ adminApiToken, pollHref }) {
+  const hdrs = { 'Authorization': `SSWS ${adminApiToken}`, 'Accept': 'application/json' };
+  const t0   = Date.now();
+  try {
+    const r = await axios.get(pollHref, { headers: hdrs, validateStatus: () => true });
+    return { statusCode: r.status, durationMs: Date.now() - t0, factorResult: r.data?.factorResult, response: r.data };
+  } catch (e) { return { statusCode: 0, factorResult: 'ERROR', error: e.message }; }
+}
+
 async function deleteApp({ oktaDomain, adminApiToken, appId }) {
   const base = `https://${oktaDomain}/api/v1/apps/${appId}`;
   const hdrs = plain(adminApiToken);
@@ -158,4 +186,4 @@ async function deleteApp({ oktaDomain, adminApiToken, appId }) {
   return { success: del.status === 204, statusCode: del.status, steps };
 }
 
-module.exports = { createApp, getApp, cloneApp, findUser, listFactors, resetFactor, getSystemLog, assignAppOwner, deleteApp };
+module.exports = { createApp, getApp, cloneApp, findUser, listFactors, resetFactor, getSystemLog, assignAppOwner, deleteApp, factorChallenge, factorPoll };

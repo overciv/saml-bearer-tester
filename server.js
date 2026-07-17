@@ -10,7 +10,7 @@ const { generatePkjwtKeyPair, generateClientAssertion, validateClientAssertion }
 const { backchannelAuthorize, pollToken } = require('./src/ciba');
 const { exchange: tokenExchange } = require('./src/token-exchange');
 const { revokeAndVerify, getTokenLifetime } = require('./src/token-inspector');
-const { createApp, getApp, cloneApp, findUser, listFactors, resetFactor, getSystemLog, assignAppOwner, deleteApp } = require('./src/admin-api');
+const { createApp, getApp, cloneApp, findUser, listFactors, resetFactor, getSystemLog, assignAppOwner, deleteApp, factorChallenge, factorPoll } = require('./src/admin-api');
 const { getConfig, saveConfig, getSigningKey, generateSigningKey, getPublicJwks, getPublicConfig } = require('./src/config');
 const { requireAuth, loginHandler, callbackHandler, logoutHandler, meHandler } = require('./src/auth');
 
@@ -243,6 +243,16 @@ app.post('/api/admin/list-factors', async (req, res) => {
 
 app.post('/api/admin/reset-factor', async (req, res) => {
   try { res.json(await resetFactor(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/factor-challenge', async (req, res) => {
+  try { res.json(await factorChallenge(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/admin/factor-poll', async (req, res) => {
+  try { res.json(await factorPoll(req.body)); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
