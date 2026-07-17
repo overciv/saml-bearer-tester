@@ -62,6 +62,10 @@ app.post('/api/auth/generate-signing-key', async (req, res) => {
 // ─── Auth guard (protects static files + API routes below) ───────────────────
 
 app.use(requireAuth);
+
+// Root redirect: / → /home.html  (SAML page lives at /index.html)
+app.get('/', (req, res) => res.redirect('/home.html'));
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
