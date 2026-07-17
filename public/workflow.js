@@ -513,17 +513,8 @@ function renderStepCard(step, idx) {
           </button>
         </div>
       </div>`;
-    } else if (step.result.outputs && Object.keys(step.result.outputs).length) {
-      const rows = Object.entries(step.result.outputs)
-        .filter(([,v]) => v)
-        .map(([k,v]) => `<div class="result-output-row">
-          <span class="result-key">${escHtml(k)}</span>
-          <span class="result-val" title="${escHtml(v)}" onclick="showTokenPopup('${escHtml(v)}')">${escHtml(typeof v==='string'?v.slice(0,60)+(v.length>60?'…':''):String(v))}</span>
-          <button class="btn btn-outline-secondary btn-sm" onclick="copyRaw('${escHtml(v)}')" title="Copy"><i class="bi bi-clipboard"></i></button>
-        </div>`).join('');
-      resultHtml = `<div class="step-result">${rows}</div>`;
-    } else if (step.status === 'success') {
-      resultHtml = `<div class="step-result" style="color:var(--green);font-size:0.78rem">✓ Completed</div>`;
+    } else {
+      resultHtml = _renderStepResult(step);
     }
   }
 
@@ -710,9 +701,110 @@ function skipStepAndContinue(stepId) {
   runChain(idx + 1);
 }
 
-function renderStepCard_update(step) {
-  // Just re-render the full pipeline for simplicity
-  renderPipeline();
+function renderStepCard_update(step) { renderPipeline(); }
+
+// ─── Result display helpers ───────────────────────────────────────────────────
+
+function _tokenSummary(token) {
+  if (!token) return null;
+  const d = decodeJwt(token);
+  if (!d) return null;
+  const p = d.payload;
+  const exp = p.exp ? new Date(p.exp * 1000) : null;
+  return {
+    _type: p.uid ? 'User Token' : 'Machine (M2M)',
+    _dpop: !!p.cnf?.jkt,
+    sub:   p.sub,
+    cid:   p.cid,
+    acr:   p.acr ? p.acr.replace('urn:okta:loa:','') : undefined,
+    amr:   Array.isArray(p.amr) ? p.amr.join(', ') : p.amr,
+    scp:   Array.isArray(p.scp) ? p.scp.join(' ') : p.scp,
+    exp:   exp ? exp.toLocaleString() : undefined,
+    _expired: !!(exp && exp < new Date()),
+  };
+}
+
+function _renderStepResult(step) {
+  const r = step.result;
+  if (!r) return '';
+
+  // Timing badge (shown for all steps that have it)
+  const timing = r.durationMs != null
+    ? `<span style="background:rgba(45,217,198,0.1);color:#2dd9c6;border:1px solid rgba(45,217,198,0.25);border-radius:10px;padding:1px 7px;font-size:0.68rem;font-weight:700;font-family:monospace;display:inline-block;margin-bottom:5px">⏱ ${r.durationMs}ms</span> `
+    : '';
+
+  // ── token-inspect: show decoded claims ─────────────────────────────────────
+  if (step.type === 'token-inspect' && r.decoded) {
+    const p = r.decoded.payload;
+    const exp  = p.exp ? new Date(p.exp * 1000) : null;
+    const ok   = exp && exp > new Date();
+    const keys = ['sub','cid','uid','acr','amr','scp'];
+    const rows = keys.filter(k => p[k] !== undefined).map(k => {
+      const v = Array.isArray(p[k]) ? p[k].join(', ') : String(p[k]);
+      return `<div class="result-output-row">
+        <span class="result-key" style="color:#e3b341">${k}</span>
+        <span class="result-val">${escHtml(v.length>80 ? v.slice(0,80)+'…' : v)}</span>
+      </div>`;
+    }).join('');
+    const expRow = exp ? `<div class="result-output-row">
+      <span class="result-key" style="color:#e3b341">exp</span>
+      <span class="result-val" style="color:${ok?'var(--green)':'var(--red)'}">${ok?'✓ Valid':'⚠ Expired'} · ${exp.toLocaleString()}</span>
+    </div>` : '';
+    const dpop = p.cnf?.jkt ? `<span style="color:#2dd9c6;font-size:0.68rem"> · DPoP-bound</span>` : '';
+    const typeLabel = p.uid ? 'User Token' : 'Machine Token (M2M)';
+    return `<div class="step-result">
+      ${timing}<span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">${typeLabel}${dpop}</span>
+      ${rows}${expRow}
+    </div>`;
+  }
+
+  // ── token-revoke: show revocation verdict ──────────────────────────────────
+  if (step.type === 'token-revoke') {
+    const icon = r.revoked ? '✓' : '⚠';
+    const color = r.revoked ? 'var(--green)' : 'var(--yellow)';
+    const msg   = r.revoked ? 'Revoked — active: false (confirmed)' : 'Revoke sent (introspect still pending)';
+    return `<div class="step-result">${timing}<span style="color:${color};font-size:0.78rem">${icon} ${msg}</span></div>`;
+  }
+
+  // ── mfa-list-factors: factor list ─────────────────────────────────────────
+  if (step.type === 'mfa-list-factors' && (r.factorCount != null || r.summary)) {
+    return `<div class="step-result">${timing}
+      <div style="font-size:0.78rem;color:var(--green)">✓ ${r.factorCount ?? '?'} factor${r.factorCount!==1?'s':''} found</div>
+      ${r.summary ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:2px">${escHtml(r.summary)}</div>` : ''}
+    </div>`;
+  }
+
+  // ── token summary for all token-producing steps ────────────────────────────
+  if (r.summary && typeof r.summary === 'object') {
+    const s = r.summary;
+    const typeLine = s._type ? `<div style="font-size:0.68rem;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;margin-bottom:3px">${s._type}${s._dpop?' · DPoP':''}</div>` : '';
+    const rows = [
+      s.sub && ['sub', s.sub],
+      s.cid && ['cid', s.cid],
+      s.acr && ['acr', s.acr],
+      s.amr && ['amr', s.amr],
+      s.scp && ['scope', s.scp],
+      s.exp && ['exp', (s._expired ? '⚠ Expired · ' : '✓ Valid · ') + s.exp],
+    ].filter(Boolean).map(([k,v]) => `<div class="result-output-row">
+      <span class="result-key">${k}</span>
+      <span class="result-val" style="${k==='exp'&&s._expired?'color:var(--red)':k==='exp'?'color:var(--green)':''}">${escHtml(v.slice(0,80)+(v.length>80?'…':''))}</span>
+    </div>`).join('');
+    return `<div class="step-result">${timing}${typeLine}${rows}</div>`;
+  }
+
+  // ── Named outputs (fallback) ───────────────────────────────────────────────
+  if (r.outputs && Object.keys(r.outputs).filter(k => r.outputs[k]).length) {
+    const rows = Object.entries(r.outputs).filter(([,v]) => v).map(([k,v]) =>
+      `<div class="result-output-row">
+        <span class="result-key">${escHtml(k)}</span>
+        <span class="result-val" onclick="showTokenPopup('${escHtml(String(v))}')">${escHtml(String(v).slice(0,60)+(String(v).length>60?'…':''))}</span>
+        <button class="btn btn-outline-secondary btn-sm" onclick="copyRaw('${escHtml(String(v))}')" title="Copy"><i class="bi bi-clipboard"></i></button>
+      </div>`).join('');
+    return `<div class="step-result">${timing}${rows}</div>`;
+  }
+
+  // ── Bare success ───────────────────────────────────────────────────────────
+  return `<div class="step-result">${timing}<span style="color:var(--green);font-size:0.78rem">✓ Completed</span></div>`;
 }
 
 async function executeStep(step, inputs, domain, sid) {
@@ -729,7 +821,10 @@ async function executeStep(step, inputs, domain, sid) {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId, clientSecret:c.clientSecret, scope:(c.scope||'openid').split(/\s+/) })
       }).then(r=>r.json());
-      return { success:r.success, outputs:{ access_token:r.response?.access_token }, error:!r.success?(r.response?.error_description||`HTTP ${r.statusCode}`):null, raw:r };
+      const at = r.response?.access_token;
+      return { success:r.success, outputs:{ access_token:at },
+        durationMs:r.durationMs, summary:_tokenSummary(at),
+        error:!r.success?(r.response?.error_description||`HTTP ${r.statusCode}`):null };
     }
 
     case 'token-exchange': {
@@ -738,14 +833,18 @@ async function executeStep(step, inputs, domain, sid) {
         body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId, clientSecret:c.clientSecret,
           subjectToken:inputs.subject_token, subjectTokenType:'urn:ietf:params:oauth:token-type:access_token', scope:(c.scope||'openid').split(/\s+/) })
       }).then(r=>r.json());
-      return { success:r.success, outputs:{ access_token:r.response?.access_token, id_token:r.response?.id_token, refresh_token:r.response?.refresh_token }, error:!r.success?(r.response?.error_description||r.response?.error||`HTTP ${r.statusCode}`):null };
+      const at = r.response?.access_token;
+      return { success:r.success, outputs:{ access_token:at, id_token:r.response?.id_token, refresh_token:r.response?.refresh_token },
+        durationMs:r.durationMs, summary:_tokenSummary(at),
+        error:!r.success?(r.response?.error_description||r.response?.error||`HTTP ${r.statusCode}`):null };
     }
 
     case 'token-inspect': {
       const token = inputs.token;
       if (!token) return { success:false, error:'No token provided — bind this step\'s input to a previous step\'s output' };
       const decoded = decodeJwt(token);
-      return { success:!!decoded, outputs:{}, decoded, error:decoded?null:'Could not decode token' };
+      if (!decoded) return { success:false, error:'Could not decode — not a valid JWT' };
+      return { success:true, outputs:{}, decoded };
     }
 
     case 'token-revoke': {
@@ -757,15 +856,30 @@ async function executeStep(step, inputs, domain, sid) {
         method:'POST', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:cid, clientSecret:csec, token, tokenTypeHint:'access_token' })
       }).then(r=>r.json());
-      return { success:r.revoked, outputs:{}, error:!r.revoked?'Token not revoked':null };
+      return { success:r.revoked, outputs:{}, revoked:r.revoked,
+        durationMs: r.steps?.reduce((t,s) => t+(s.durationMs||0), 0),
+        error:!r.revoked?'Revoke sent but token may still be active (propagation)':null };
     }
 
     case 'pkjwt-token': {
-      const r = await fetch('/api/pkjwt/exchange-token', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId, clientAssertion:c.clientAssertion, scope:(c.scope||'openid').split(/\s+/), grantType:'client_credentials' })
-      }).then(r=>r.json());
-      return { success:r.success, outputs:{ access_token:r.response?.access_token }, error:!r.success?(r.response?.error_description||`HTTP ${r.statusCode}`):null };
+      // Generate assertion from the stored private JWK, or use configAssertion
+      let body = { oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId, scope:(c.scope||'openid').split(/\s+/), grantType:'client_credentials' };
+      if (c.privateJwk) {
+        try {
+          const kp = await fetch('/api/pkjwt/generate-assertion', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ privateJwk:JSON.parse(c.privateJwk), clientId:c.clientId,
+              audience: (c.authServerId||stepSid) ? `https://${stepDomain}/oauth2/${c.authServerId||stepSid}/v1/token` : `https://${stepDomain}/oauth2/v1/token`,
+              validitySeconds:300 })
+          }).then(r=>r.json());
+          body.clientAssertion = kp.assertion;
+        } catch {}
+      }
+      const r = await fetch('/api/pkjwt/exchange-token', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }).then(r=>r.json());
+      const at = r.response?.access_token;
+      return { success:r.success, outputs:{ access_token:at, refresh_token:r.response?.refresh_token },
+        durationMs:r.durationMs, summary:_tokenSummary(at),
+        error:!r.success?(r.response?.error_description||`HTTP ${r.statusCode}`):null };
     }
 
     case 'dpop-token': {
@@ -775,7 +889,11 @@ async function executeStep(step, inputs, domain, sid) {
         body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId, clientSecret:c.clientSecret,
           scope:(c.scope||'openid').split(/\s+/), grantType:'client_credentials', privateJwk:kp.privateJwk, publicJwk:kp.publicJwk })
       }).then(r=>r.json());
-      return { success:r.success, outputs:{ access_token:r.response?.access_token }, error:!r.success?(r.response?.error||`HTTP ${r.statusCode}`):null };
+      const at = r.response?.access_token;
+      const ms = r.steps?.filter(s=>s.type==='request').reduce((t,s)=>t+(s.durationMs||0),0);
+      return { success:r.success, outputs:{ access_token:at },
+        durationMs:ms, summary:_tokenSummary(at),
+        error:!r.success?(r.response?.error||`HTTP ${r.statusCode}`):null };
     }
 
     case 'ropc': {
@@ -786,8 +904,10 @@ async function executeStep(step, inputs, domain, sid) {
           username:c.username, password:c.password,
           scope:(c.scope||'openid').split(/\s+/) })
       }).then(r=>r.json());
+      const at = r.response?.access_token;
       return { success:r.success,
-        outputs:{ access_token:r.response?.access_token, id_token:r.response?.id_token, refresh_token:r.response?.refresh_token },
+        outputs:{ access_token:at, id_token:r.response?.id_token, refresh_token:r.response?.refresh_token },
+        durationMs:r.durationMs, summary:_tokenSummary(at),
         error:!r.success?(r.response?.error_description||r.response?.error||`HTTP ${r.statusCode}`):null };
     }
 
@@ -806,8 +926,11 @@ async function executeStep(step, inputs, domain, sid) {
         body: JSON.stringify({ oktaDomain:stepDomain, adminApiToken:adminToken, userId })
       }).then(r=>r.json());
       const factors = fRes.response || [];
-      const summary = factors.map(f => `${f.factorType}/${f.status}`).join(', ') || 'none';
-      return { success:fRes.success, outputs:{ user_id:userId }, factorCount:factors.length, summary, error:!fRes.success?`HTTP ${fRes.statusCode}`:null };
+      const active  = factors.filter(f => f.status === 'ACTIVE');
+      const summary = active.map(f => (f.factorType.split(':').pop() + '/' + f.status)).join(', ') || 'none enrolled';
+      return { success:fRes.success, outputs:{ user_id:userId },
+        factorCount:factors.length, summary:`${active.length} active: ${summary}`,
+        error:!fRes.success?`HTTP ${fRes.statusCode}`:null };
     }
 
     case 'mfa-challenge': {
@@ -873,13 +996,18 @@ async function executeStep(step, inputs, domain, sid) {
       // Poll for result (up to 60s)
       const authReqId = authRes.response.auth_req_id;
       const interval  = (authRes.response.interval || 5) * 1000;
+      const t0ciba = Date.now();
       for (let i=0; i < 12; i++) {
         await new Promise(r => setTimeout(r, interval));
         const poll = await fetch('/api/ciba/poll', {
           method:'POST', headers:{'Content-Type':'application/json'},
           body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId, clientSecret:c.clientSecret, authReqId, scope:(c.scope||'openid').split(/\s+/) })
         }).then(r=>r.json());
-        if (poll.success) return { success:true, outputs:{ access_token:poll.response?.access_token, id_token:poll.response?.id_token }, raw:poll };
+        if (poll.success) {
+          const at = poll.response?.access_token;
+          return { success:true, outputs:{ access_token:at, id_token:poll.response?.id_token },
+            durationMs: Date.now()-t0ciba, summary:_tokenSummary(at) };
+        }
         if (poll.denied || poll.expired) return { success:false, error:poll.denied?'User denied':'Request expired', outputs:{} };
       }
       return { success:false, error:'CIBA timeout (60s)', outputs:{} };
@@ -921,21 +1049,24 @@ async function execAuthCode(step, domain, sid) {
     const popup = window.open(authUrl, 'okta-auth', 'width=600,height=700,left=200,top=100');
 
     let done = false;
-    const finish = (tokens, error) => {
+    const finish = (tokens, error, durationMs) => {
       if (done) return; done = true;
       clearInterval(pollTimer);
       window.removeEventListener('message', msgHandler);
-      if (tokens) resolve({ success:true, outputs:{ access_token:tokens.access_token, id_token:tokens.id_token, refresh_token:tokens.refresh_token } });
+      if (tokens) resolve({ success:true,
+        outputs:{ access_token:tokens.access_token, id_token:tokens.id_token, refresh_token:tokens.refresh_token },
+        durationMs,
+        summary: _tokenSummary(tokens.access_token) });
       else resolve({ success:false, error: error || 'Auth failed', outputs:{} });
     };
 
-    const msgHandler = (e) => { if (e.data?.type==='oauth-callback') finish(e.data.tokens, e.data.error); };
+    const msgHandler = (e) => { if (e.data?.type==='oauth-callback') finish(e.data.tokens, e.data.error, e.data.durationMs); };
     window.addEventListener('message', msgHandler);
 
     const pollTimer = setInterval(async () => {
       const s = await fetch(`/api/oauth/status/${flowId}`).then(r=>r.json()).catch(()=>null);
       if (!s) return;
-      if (s.status === 'success') finish(s.tokens, null);
+      if (s.status === 'success') finish(s.tokens, null, s.durationMs);
       if (s.status === 'error')   finish(null, s.error);
     }, 1500);
 
