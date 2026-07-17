@@ -96,7 +96,8 @@ function handlePopupResult(data) {
     document.getElementById(acrId).innerHTML =
       `<span style="color:var(--text-muted)">acr: </span><strong style="color:var(--blue)">${escHtml(acr)}</strong>
        &nbsp;&nbsp;<span style="color:var(--text-muted)">amr: </span><strong style="color:var(--blue)">[${escHtml(amr)}]</strong>
-       &nbsp;&nbsp;<span style="color:var(--text-muted)">auth_time: </span><strong style="color:var(--blue)">${escHtml(atime)}</strong>`;
+       &nbsp;&nbsp;<span style="color:var(--text-muted)">auth_time: </span><strong style="color:var(--blue)">${escHtml(atime)}</strong>`
+      + renderHttpExchange({ statusCode:200, durationMs:data.durationMs, requestDetails:data.requestDetails, response:data.tokens });
 
     toast(`${target === 'baseline' ? 'Baseline' : 'Step-Up'} token received!`, 'success');
     updateComparison();

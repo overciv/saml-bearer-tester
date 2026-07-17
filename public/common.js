@@ -250,6 +250,52 @@ async function initNavAuth() {
   } catch { /* server not yet ready — ignore */ }
 }
 
+// ─── HTTP Exchange display ─────────────────────────────────────────────────────
+// Renders a reusable "Time to Token / Request / Response" section.
+// options: { url, method, statusCode, durationMs, requestDetails, response, open }
+function renderHttpExchange({ url, method = 'POST', statusCode, durationMs, requestDetails, response, open = false } = {}) {
+  const ok     = statusCode >= 200 && statusCode < 300;
+  const timing = durationMs != null
+    ? `<span style="background:rgba(45,217,198,0.1);color:#2dd9c6;border:1px solid rgba(45,217,198,0.25);border-radius:10px;padding:2px 8px;font-size:0.7rem;font-weight:700;font-family:monospace;margin-left:6px">⏱ ${durationMs}ms</span>` : '';
+  const endpoint = url
+    ? `<span style="font-size:0.7rem;color:var(--text-muted);font-family:monospace;margin-left:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:400px;display:inline-block;vertical-align:middle">${escHtml(url)}</span>` : '';
+
+  const reqJson  = requestDetails ? JSON.stringify(requestDetails, null, 2) : null;
+  const respJson = response       ? JSON.stringify(response, null, 2)       : null;
+
+  const reqSection = reqJson ? `
+    <details${open?' open':''} style="margin-top:6px">
+      <summary style="cursor:pointer;font-size:0.75rem;color:var(--text-muted);padding:3px 0;user-select:none;list-style:none;display:flex;align-items:center;gap:5px">
+        <i class="bi bi-arrow-up-circle"></i> Request
+      </summary>
+      <div style="position:relative;margin-top:4px">
+        <div class="code-block json" style="max-height:220px">${escHtml(reqJson)}</div>
+        <button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyRaw(${JSON.stringify(reqJson)})"><i class="bi bi-clipboard"></i></button>
+      </div>
+    </details>` : '';
+
+  const respSection = respJson ? `
+    <details${open?' open':''} style="margin-top:4px">
+      <summary style="cursor:pointer;font-size:0.75rem;color:var(--text-muted);padding:3px 0;user-select:none;list-style:none;display:flex;align-items:center;gap:5px">
+        <i class="bi bi-arrow-down-circle"></i> Response
+      </summary>
+      <div style="position:relative;margin-top:4px">
+        <div class="code-block json" style="max-height:220px">${escHtml(respJson)}</div>
+        <button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyRaw(${JSON.stringify(respJson)})"><i class="bi bi-clipboard"></i></button>
+      </div>
+    </details>` : '';
+
+  return `<div style="border-top:1px solid var(--border);padding-top:10px;margin-top:12px">
+    <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:4px">
+      <span class="status-badge ${ok?'status-ok':'status-err'}">HTTP ${statusCode||'—'}</span>
+      ${timing}
+      ${endpoint}
+    </div>
+    ${reqSection}
+    ${respSection}
+  </div>`;
+}
+
 // Status badge
 function statusBadge(code) {
   const ok = code >= 200 && code < 300;

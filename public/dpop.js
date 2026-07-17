@@ -96,7 +96,10 @@ async function acquireToken() {
 
     const ok = res.success;
     document.getElementById('tokenResultStatus').innerHTML =
-      `${statusBadge(res.statusCode)}<span style="font-size:0.75rem;color:var(--text-muted);margin-left:8px">${res.tokenEndpoint}${res.usedNonce ? ' · nonce used' : ''}</span>`;
+      renderHttpExchange({ url:res.tokenEndpoint, statusCode:res.statusCode,
+        durationMs: res.steps?.filter(s=>s.type==='request').reduce((t,s)=>t+(s.durationMs||0),0),
+        response:res.response })
+      + (res.usedNonce ? `<div style="font-size:0.75rem;color:var(--yellow);margin-top:4px"><i class="bi bi-key me-1"></i>Nonce was required and used</div>` : '');
 
     document.getElementById('rawTokenResp').textContent = JSON.stringify(res.response, null, 2);
 

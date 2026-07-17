@@ -51,7 +51,8 @@ async function getToken() {
 
     document.getElementById('resultSection').style.display = '';
     document.getElementById('resultStatus').innerHTML =
-      `${statusBadge(res.statusCode)}<span style="font-size:0.75rem;color:var(--text-muted);margin-left:8px">${res.durationMs}ms · ${res.tokenEndpoint}</span>`;
+      renderHttpExchange({ url:res.tokenEndpoint, statusCode:res.statusCode, durationMs:res.durationMs,
+        requestDetails:res.requestDetails, response:res.response||res.error });
     document.getElementById('rawResponse').textContent = JSON.stringify(res.response || res.error, null, 2);
 
     if (res.success && res.response?.access_token) {

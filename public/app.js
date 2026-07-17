@@ -162,15 +162,8 @@ async function exchangeToken() {
     document.getElementById('exchangeResult').style.display = '';
 
     const statusEl = document.getElementById('exchangeStatus');
-    if (res.success) {
-      statusEl.innerHTML = `
-        <span class="status-badge status-ok"><i class="bi bi-check-circle me-1"></i>HTTP ${res.statusCode} OK</span>
-        <span style="font-size:0.75rem; color:var(--text-muted); margin-left:8px">${res.durationMs}ms · ${res.tokenEndpoint}</span>`;
-    } else {
-      statusEl.innerHTML = `
-        <span class="status-badge status-err"><i class="bi bi-x-circle me-1"></i>HTTP ${res.statusCode || 'Error'}</span>
-        <span style="font-size:0.75rem; color:var(--text-muted); margin-left:8px">${res.durationMs}ms · ${res.tokenEndpoint}</span>`;
-    }
+    statusEl.innerHTML = renderHttpExchange({ url:res.tokenEndpoint, statusCode:res.statusCode, durationMs:res.durationMs, requestDetails:res.requestDetails, response:res.response||res.error });
+    if (!res.success) { /* error already shown in renderHttpExchange */ }
 
     document.getElementById('requestDetails').textContent =
       JSON.stringify(res.requestDetails, null, 2);

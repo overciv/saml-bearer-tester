@@ -90,6 +90,23 @@
               <label class="form-label">Scopes</label>
               <input type="text" id="scope" class="form-control" value="openid profile email">
             </div>
+            <div class="col-md-4">
+              <label class="form-label">Client Authentication</label>
+              <select id="clientAuthMethod" class="form-select" onchange="toggleClientAuth()">
+                <option value="none">None (public client)</option>
+                <option value="basic">Client Secret (Basic)</option>
+                <option value="pkjwt">Private Key JWT</option>
+              </select>
+              <div class="input-hint">Web apps typically use Basic or PKJWT</div>
+            </div>
+            <div id="clientSecretRow" class="col-md-8" style="display:none">
+              <label class="form-label">Client Secret</label>
+              <input type="password" id="clientSecret" class="form-control" placeholder="Used in Authorization: Basic header at token exchange">
+            </div>
+            <div id="pkjwtRow" class="col-12" style="display:none">
+              <label class="form-label">Private JWK (for client assertion)</label>
+              <textarea id="clientPrivateJwk" class="form-control" rows="3" style="font-family:monospace;font-size:0.78rem" placeholder='{"kty":"RSA","alg":"RS256","d":"...","kid":"..."}' ></textarea>
+            </div>
           </div>
         </div>
       </div>
@@ -111,6 +128,7 @@
         <div class="card-header"><div class="section-title"><i class="bi bi-ticket-detailed"></i>Step 3 — Tokens</div></div>
         <div class="card-body p-4">
           <div id="tokensPlaceholder" style="color:var(--text-muted);font-size:0.82rem">Complete authorization to see tokens here.</div>
+          <div id="httpExchange"></div>
           <div id="tokensContent" style="display:none">
             <div id="tokenResultStatus" class="mb-3"></div>
             <div class="tabs-nav" id="tokenTabs">

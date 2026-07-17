@@ -1,5 +1,5 @@
 'use strict';
-const CONFIG_FIELDS = ['oktaDomain','authServerId','clientId','redirectUri','scope'];
+const CONFIG_FIELDS = ['oktaDomain','authServerId','clientId','redirectUri','scope','clientAuthMethod','clientSecret'];
 let currentFlowId = null;
 let pollTimer = null;
 
@@ -14,9 +14,14 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function setupAutoFill() {
-  // Auto-fill redirect URI default
   const ri = document.getElementById('redirectUri');
   if (!ri.value) ri.value = 'http://localhost:3000/oauth/callback';
+}
+
+function toggleClientAuth() {
+  const m = val('clientAuthMethod');
+  document.getElementById('clientSecretRow').style.display = m === 'basic'  ? '' : 'none';
+  document.getElementById('pkjwtRow').style.display        = m === 'pkjwt'  ? '' : 'none';
 }
 
 async function startAuth() {
@@ -26,12 +31,21 @@ async function startAuth() {
   setLoading(btn, true, '<i class="bi bi-box-arrow-up-right me-1"></i>Opening…');
 
   try {
+    const authMethod = val('clientAuthMethod') || 'none';
+    let privateJwk;
+    if (authMethod === 'pkjwt') {
+      try { privateJwk = JSON.parse(val('clientPrivateJwk') || document.getElementById('clientPrivateJwk')?.value || ''); }
+      catch { toast('Invalid Private JWK JSON', 'error'); setLoading(btn, false, '<i class="bi bi-box-arrow-up-right me-1"></i>Open Okta Login'); return; }
+    }
     const res = await post('/api/oauth/start', {
       oktaDomain: val('oktaDomain'),
       authServerId: val('authServerId'),
       clientId: val('clientId'),
       redirectUri: val('redirectUri') || 'http://localhost:3000/oauth/callback',
-      scope: val('scope') || 'openid profile email'
+      scope: val('scope') || 'openid profile email',
+      clientAuthMethod: authMethod,
+      clientSecret: authMethod === 'basic' ? (document.getElementById('clientSecret')?.value || '') : undefined,
+      privateJwk: authMethod === 'pkjwt' ? privateJwk : undefined,
     });
 
     currentFlowId = res.flowId;
@@ -54,7 +68,8 @@ async function startAuth() {
       if (!status) return;
       if (status.status === 'success' || status.status === 'error') {
         clearInterval(pollTimer); pollTimer = null;
-        handleCallbackResult({ flowId: currentFlowId, status: status.status, tokens: status.tokens, error: status.error });
+        handleCallbackResult({ flowId: currentFlowId, status: status.status, tokens: status.tokens, error: status.error,
+          tokenEndpoint: status.tokenEndpoint, durationMs: status.durationMs, requestDetails: status.requestDetails });
       }
     }, 1500);
 
@@ -74,6 +89,11 @@ function handleCallbackResult(data) {
   document.getElementById('tokensContent').style.display = '';
 
   if (data.status === 'success' && data.tokens) {
+    // Show HTTP exchange (timing + request/response)
+    document.getElementById('httpExchange').innerHTML = renderHttpExchange({
+      url: data.tokenEndpoint, statusCode: 200, durationMs: data.durationMs,
+      requestDetails: data.requestDetails, response: data.tokens
+    });
     document.getElementById('tokenResultStatus').innerHTML =
       `<span class="status-badge status-ok"><i class="bi bi-check-circle me-1"></i>Tokens received</span>`;
 

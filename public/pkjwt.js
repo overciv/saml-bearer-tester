@@ -134,7 +134,8 @@ async function exchangeToken() {
 
     document.getElementById('exchangeResult').style.display = '';
     document.getElementById('exchangeStatus').innerHTML =
-      `${statusBadge(res.statusCode)}<span style="font-size:0.75rem;color:var(--text-muted);margin-left:8px">${res.durationMs}ms · ${res.tokenEndpoint}</span>`;
+      renderHttpExchange({ url:res.tokenEndpoint, statusCode:res.statusCode, durationMs:res.durationMs,
+        requestDetails:res.requestDetails, response:res.response||res.error });
     document.getElementById('exchangeReqDetails').textContent = JSON.stringify(res.requestDetails, null, 2);
     document.getElementById('exchRawResp').textContent = JSON.stringify(res.response || res.error, null, 2);
 
