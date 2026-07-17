@@ -133,51 +133,142 @@
 
           <!-- Create -->
           <div id="appTabCreate">
+
+            <!-- Protocol selector -->
+            <div class="d-flex align-items-center gap-3 mb-3 p-3" style="background:var(--surface2);border-radius:8px;">
+              <span style="font-size:0.8rem;color:var(--text-muted);font-weight:600;">Protocol:</span>
+              <button class="btn btn-sm" id="protoOidcBtn" onclick="setProtocol('oidc')" style="background:rgba(61,203,122,0.1);color:var(--emerald);border:1px solid rgba(61,203,122,0.3)"><i class="bi bi-shield-check me-1"></i>OIDC</button>
+              <button class="btn btn-sm" id="protoSamlBtn" onclick="setProtocol('saml')" style="color:var(--text-muted);border:1px solid var(--border)"><i class="bi bi-file-earmark-code me-1"></i>SAML 2.0</button>
+            </div>
+
+            <!-- Common fields -->
             <div class="row g-3">
-              <div class="col-md-6"><label class="form-label">App Label *</label><input type="text" id="appLabel" class="form-control" placeholder="My New OIDC App"></div>
-              <div class="col-md-3">
-                <label class="form-label">App Type</label>
-                <select id="appType" class="form-select">
-                  <option value="web">Web (server-side)</option>
-                  <option value="browser">SPA / Browser</option>
-                  <option value="native">Native / Mobile</option>
-                  <option value="service">Service (M2M)</option>
-                </select>
+              <div class="col-md-6"><label class="form-label">App Label *</label><input type="text" id="appLabel" class="form-control" placeholder="My New App"></div>
+
+              <!-- OIDC fields -->
+              <div id="oidcFields" class="col-12">
+                <div class="row g-3">
+                  <div class="col-md-3">
+                    <label class="form-label">App Type</label>
+                    <select id="appType" class="form-select">
+                      <option value="web">Web (server-side)</option>
+                      <option value="browser">SPA / Browser</option>
+                      <option value="native">Native / Mobile</option>
+                      <option value="service">Service (M2M)</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Client Auth Method</label>
+                    <select id="appAuthMethod" class="form-select">
+                      <option value="client_secret_basic">client_secret_basic</option>
+                      <option value="client_secret_post">client_secret_post</option>
+                      <option value="private_key_jwt">private_key_jwt</option>
+                      <option value="none">none (PKCE only)</option>
+                    </select>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Redirect URIs <span style="color:var(--text-muted)">(one per line)</span></label>
+                    <textarea id="appRedirectUris" class="form-control" rows="2" placeholder="https://myapp.example.com/callback&#10;http://localhost:3000/callback"></textarea>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Grant Types</label>
+                    <div class="grant-checks">
+                      <label class="grant-check"><input type="checkbox" id="grant_authcode" checked> authorization_code</label>
+                      <label class="grant-check"><input type="checkbox" id="grant_refresh" checked> refresh_token</label>
+                      <label class="grant-check"><input type="checkbox" id="grant_creds"> client_credentials</label>
+                      <label class="grant-check"><input type="checkbox" id="grant_device"> device_code</label>
+                      <label class="grant-check"><input type="checkbox" id="grant_tokex"> token-exchange</label>
+                      <label class="grant-check"><input type="checkbox" id="grant_saml_grant"> saml2-bearer</label>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div class="col-md-3">
-                <label class="form-label">Client Auth Method</label>
-                <select id="appAuthMethod" class="form-select">
-                  <option value="client_secret_basic">client_secret_basic</option>
-                  <option value="client_secret_post">client_secret_post</option>
-                  <option value="private_key_jwt">private_key_jwt</option>
-                  <option value="none">none (PKCE only)</option>
-                </select>
+
+              <!-- SAML fields -->
+              <div id="samlFields" class="col-12" style="display:none">
+                <div class="row g-3">
+                  <div class="col-12">
+                    <label class="form-label">ACS URL (Assertion Consumer Service) *</label>
+                    <input type="text" id="samlAcsUrl" class="form-control" placeholder="https://sp.example.com/saml/acs">
+                    <div class="input-hint">The SP endpoint that receives the SAML assertion POST</div>
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Audience URI (SP Entity ID) *</label>
+                    <input type="text" id="samlAudience" class="form-control" placeholder="https://sp.example.com/metadata">
+                    <div class="input-hint">Unique identifier for the Service Provider — matches the SAML Conditions/AudienceRestriction</div>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Recipient <span style="color:var(--text-muted)">(defaults to ACS URL)</span></label>
+                    <input type="text" id="samlRecipient" class="form-control" placeholder="Same as ACS URL">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Default Relay State <span style="color:var(--text-muted)">(optional)</span></label>
+                    <input type="text" id="samlRelayState" class="form-control" placeholder="">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Name ID Format</label>
+                    <select id="samlNameIdFormat" class="form-select">
+                      <option value="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">Email Address</option>
+                      <option value="urn:oasis:names:tc:SAML:2.0:nameid-format:persistent">Persistent</option>
+                      <option value="urn:oasis:names:tc:SAML:2.0:nameid-format:transient">Transient</option>
+                      <option value="urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified">Unspecified</option>
+                    </select>
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Name ID Template</label>
+                    <input type="text" id="samlNameIdTemplate" class="form-control" value="${user.userName}">
+                    <div class="input-hint">Okta expression, e.g. <code>${user.email}</code></div>
+                  </div>
+                  <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                      <label class="form-label mb-0">Attribute Statements <span style="color:var(--text-muted)">(optional)</span></label>
+                      <button class="btn btn-outline-secondary btn-sm" onclick="addSamlAttr()"><i class="bi bi-plus me-1"></i>Add</button>
+                    </div>
+                    <div id="samlAttrRows"></div>
+                    <div class="input-hint">Name → Okta expression (e.g. <code>email</code> → <code>${user.email}</code>)</div>
+                  </div>
+                </div>
               </div>
+
+              <!-- App Owner (always visible) -->
               <div class="col-12">
-                <label class="form-label">Redirect URIs <span style="color:var(--text-muted)">(one per line)</span></label>
-                <textarea id="appRedirectUris" class="form-control" rows="2" placeholder="https://myapp.example.com/callback&#10;http://localhost:3000/callback"></textarea>
-              </div>
-              <div class="col-12">
-                <label class="form-label">Grant Types</label>
-                <div class="grant-checks">
-                  <label class="grant-check"><input type="checkbox" id="grant_authcode" checked> authorization_code</label>
-                  <label class="grant-check"><input type="checkbox" id="grant_refresh" checked> refresh_token</label>
-                  <label class="grant-check"><input type="checkbox" id="grant_creds"> client_credentials</label>
-                  <label class="grant-check"><input type="checkbox" id="grant_device"> device_code</label>
-                  <label class="grant-check"><input type="checkbox" id="grant_tokex"> token-exchange</label>
-                  <label class="grant-check"><input type="checkbox" id="grant_saml"> saml2-bearer</label>
+                <div class="p-3" style="background:rgba(61,203,122,0.04);border:1px solid rgba(61,203,122,0.15);border-radius:8px;">
+                  <label class="form-label" style="color:var(--emerald)"><i class="bi bi-person-gear me-1"></i>App Owner <span style="color:var(--text-muted);font-weight:400">(optional)</span></label>
+                  <input type="text" id="appOwner" class="form-control" placeholder="admin@example.com or userId">
+                  <div class="input-hint">After creation, assigns this user the <strong>APP_ADMIN</strong> role scoped exclusively to this application — no broader admin access granted.</div>
                 </div>
               </div>
             </div>
-            <button class="btn btn-primary btn-sm mt-3" id="createAppBtn" onclick="createApp()"><i class="bi bi-plus-circle me-1"></i>Create App via API</button>
+
+            <!-- Step 2: Generate + Preview -->
+            <button class="btn btn-outline-secondary btn-sm mt-3" id="generatePayloadBtn" onclick="generateAppPayload()">
+              <i class="bi bi-code-slash me-1"></i>Generate Request Payload
+            </button>
+
+            <div id="payloadPreviewSection" class="mt-3" style="display:none">
+              <div class="d-flex justify-content-between align-items-center mb-2">
+                <span style="font-size:0.8rem;font-weight:600;color:var(--emerald)"><i class="bi bi-pencil-square me-1"></i>Review &amp; edit — then send</span>
+                <div class="d-flex gap-2">
+                  <button class="btn btn-outline-secondary btn-sm" onclick="copyText('payloadTextarea')"><i class="bi bi-clipboard me-1"></i>Copy</button>
+                  <button class="btn btn-primary btn-sm" id="sendAppBtn" onclick="sendAppRequest()"><i class="bi bi-send-fill me-1"></i>Send to Okta</button>
+                </div>
+              </div>
+              <textarea id="payloadTextarea" class="form-control" rows="18" style="font-family:'SF Mono','Fira Code',monospace;font-size:0.78rem;background:#0d1117;color:#b5cea8;border-color:rgba(61,203,122,0.3)"></textarea>
+            </div>
+
+            <!-- Result -->
             <div id="createAppOutput" class="mt-3" style="display:none">
+              <hr style="border-color:var(--border)">
               <div id="createAppStatus" class="mb-2"></div>
               <div class="tabs-nav" id="createAppTabs">
-                <button class="tab-btn active" onclick="showCreateTab('payload')">Request Payload</button>
-                <button class="tab-btn" onclick="showCreateTab('response')">Response</button>
+                <button class="tab-btn active" onclick="showCreateTab('response')">Response</button>
+                <button class="tab-btn" onclick="showCreateTab('owner')">Owner Assignment</button>
               </div>
-              <div id="createTabPayload"><div class="position-relative"><div class="code-block" id="createPayloadEl"></div><button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('createPayloadEl')"><i class="bi bi-clipboard"></i></button></div></div>
-              <div id="createTabResponse" style="display:none"><div class="position-relative"><div class="code-block" id="createResponseEl"></div><button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('createResponseEl')"><i class="bi bi-clipboard"></i></button></div></div>
+              <div id="createTabResponse"><div class="position-relative"><div class="code-block" id="createResponseEl"></div><button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('createResponseEl')"><i class="bi bi-clipboard"></i></button></div></div>
+              <div id="createTabOwner" style="display:none">
+                <div id="ownerAssignmentResult" class="p-3" style="background:var(--surface2);border-radius:8px;font-size:0.82rem;"></div>
+                <div class="code-block mt-2" id="ownerAssignmentDetails" style="display:none"></div>
+              </div>
             </div>
           </div>
 

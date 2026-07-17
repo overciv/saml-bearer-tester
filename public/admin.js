@@ -29,51 +29,203 @@ function showAppTab(tab) {
   });
 }
 
-function showCreateTab(tab) {
-  document.getElementById('createTabPayload').style.display = tab==='payload'?'':'none';
-  document.getElementById('createTabResponse').style.display = tab==='response'?'':'none';
-  document.querySelectorAll('#createAppTabs .tab-btn').forEach((b,i) => b.classList.toggle('active', ['payload','response'][i]===tab));
+// ─── Protocol toggle ──────────────────────────────────────────────────────────
+let currentProtocol = 'oidc';
+
+function setProtocol(proto) {
+  currentProtocol = proto;
+  document.getElementById('oidcFields').style.display = proto === 'oidc' ? '' : 'none';
+  document.getElementById('samlFields').style.display  = proto === 'saml' ? '' : 'none';
+  document.getElementById('protoOidcBtn').style.cssText = proto === 'oidc'
+    ? 'background:rgba(61,203,122,0.1);color:var(--emerald);border:1px solid rgba(61,203,122,0.3)'
+    : 'color:var(--text-muted);border:1px solid var(--border)';
+  document.getElementById('protoSamlBtn').style.cssText = proto === 'saml'
+    ? 'background:rgba(61,203,122,0.1);color:var(--emerald);border:1px solid rgba(61,203,122,0.3)'
+    : 'color:var(--text-muted);border:1px solid var(--border)';
+  document.getElementById('payloadPreviewSection').style.display = 'none';
+  document.getElementById('createAppOutput').style.display = 'none';
 }
 
-async function createApp() {
-  const btn = document.getElementById('createAppBtn');
-  setLoading(btn, true, '<i class="bi bi-plus-circle me-1"></i>Creating…');
+// SAML attribute rows
+let samlAttrCount = 0;
+function addSamlAttr(name = '', value = '', format = 'basic') {
+  samlAttrCount++;
+  const id = samlAttrCount;
+  const row = document.createElement('div');
+  row.id = `samlAttr_${id}`;
+  row.className = 'd-flex gap-2 mb-2 align-items-center';
+  row.innerHTML = `
+    <input type="text" class="form-control sa-name" placeholder="Attribute name (e.g. email)" value="${escHtml(name)}" style="flex:1">
+    <input type="text" class="form-control sa-value" placeholder="Okta expression (e.g. \${user.email})" value="${escHtml(value)}" style="flex:1.5">
+    <select class="form-select sa-format" style="width:180px;flex-shrink:0">
+      <option value="basic" ${format==='basic'?'selected':''}>basic</option>
+      <option value="uri" ${format==='uri'?'selected':''}>uri reference</option>
+      <option value="unspecified" ${format==='unspecified'?'selected':''}>unspecified</option>
+    </select>
+    <button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('samlAttr_${id}').remove()" style="flex-shrink:0"><i class="bi bi-trash"></i></button>`;
+  document.getElementById('samlAttrRows').appendChild(row);
+}
 
+function collectSamlAttrs() {
+  return Array.from(document.querySelectorAll('#samlAttrRows > div')).map(row => ({
+    type: 'EXPRESSION',
+    name: row.querySelector('.sa-name')?.value?.trim() || '',
+    values: [row.querySelector('.sa-value')?.value?.trim() || ''],
+    namespace: `urn:oasis:names:tc:SAML:2.0:attrname-format:${row.querySelector('.sa-format')?.value || 'basic'}`
+  })).filter(a => a.name && a.values[0]);
+}
+
+// ─── Payload builders ─────────────────────────────────────────────────────────
+function buildOidcPayload() {
   const grantTypes = [];
-  if (document.getElementById('grant_authcode')?.checked) grantTypes.push('authorization_code');
-  if (document.getElementById('grant_refresh')?.checked)  grantTypes.push('refresh_token');
-  if (document.getElementById('grant_creds')?.checked)    grantTypes.push('client_credentials');
-  if (document.getElementById('grant_device')?.checked)   grantTypes.push('urn:ietf:params:oauth:grant-type:device_code');
-  if (document.getElementById('grant_tokex')?.checked)    grantTypes.push('urn:ietf:params:oauth:grant-type:token-exchange');
-  if (document.getElementById('grant_saml')?.checked)     grantTypes.push('urn:ietf:params:oauth:grant-type:saml2-bearer');
+  if (document.getElementById('grant_authcode')?.checked)   grantTypes.push('authorization_code');
+  if (document.getElementById('grant_refresh')?.checked)    grantTypes.push('refresh_token');
+  if (document.getElementById('grant_creds')?.checked)      grantTypes.push('client_credentials');
+  if (document.getElementById('grant_device')?.checked)     grantTypes.push('urn:ietf:params:oauth:grant-type:device_code');
+  if (document.getElementById('grant_tokex')?.checked)      grantTypes.push('urn:ietf:params:oauth:grant-type:token-exchange');
+  if (document.getElementById('grant_saml_grant')?.checked) grantTypes.push('urn:ietf:params:oauth:grant-type:saml2-bearer');
+
+  const responseTypes = grantTypes.includes('authorization_code') ? ['code'] : [];
+  return {
+    name: 'oidc_client',
+    label: val('appLabel') || 'New OIDC App',
+    signOnMode: 'OPENID_CONNECT',
+    credentials: { oauthClient: { token_endpoint_auth_method: val('appAuthMethod') } },
+    settings: {
+      oauthClient: {
+        redirect_uris: val('appRedirectUris').split('\n').map(s => s.trim()).filter(Boolean),
+        grant_types: grantTypes,
+        response_types: responseTypes,
+        application_type: val('appType')
+      }
+    }
+  };
+}
+
+function buildSamlPayload() {
+  const acsUrl = val('samlAcsUrl');
+  const attrs  = collectSamlAttrs();
+  return {
+    name: 'template_saml_2_0',
+    label: val('appLabel') || 'New SAML App',
+    signOnMode: 'SAML_2_0',
+    settings: {
+      signOn: {
+        ssoAcsUrl: acsUrl,
+        idpIssuer: 'http://www.okta.com/${org.externalKey}',
+        audience: val('samlAudience') || acsUrl,
+        recipient: val('samlRecipient') || acsUrl,
+        defaultRelayState: val('samlRelayState') || '',
+        subjectNameIdTemplate: val('samlNameIdTemplate') || '${user.userName}',
+        subjectNameIdFormat: val('samlNameIdFormat'),
+        authnContextClassRef: 'urn:oasis:names:tc:SAML:2.0:ac:classes:PasswordProtectedTransport',
+        requestCompressed: false,
+        assertionSigned: true,
+        signatureAlgorithm: 'RSA_SHA256',
+        digestAlgorithm: 'SHA256',
+        honorForceAuthn: true,
+        responseSigned: true,
+        allowMultipleAcsEndpoints: false,
+        samlSignedRequestEnabled: false,
+        attributeStatements: attrs
+      }
+    }
+  };
+}
+
+// ─── Step 1: Generate payload preview ────────────────────────────────────────
+function generateAppPayload() {
+  if (!val('appLabel')) { toast('Enter an App Label first', 'warning'); return; }
+  if (currentProtocol === 'saml' && !val('samlAcsUrl')) { toast('ACS URL is required for SAML apps', 'warning'); return; }
+
+  const payload = currentProtocol === 'oidc' ? buildOidcPayload() : buildSamlPayload();
+  document.getElementById('payloadTextarea').value = JSON.stringify(payload, null, 2);
+  document.getElementById('payloadPreviewSection').style.display = '';
+  document.getElementById('payloadTextarea').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  toast('Payload generated — review and edit, then click Send', 'info');
+}
+
+// ─── Step 2: Send request ─────────────────────────────────────────────────────
+async function sendAppRequest() {
+  const btn = document.getElementById('sendAppBtn');
+  setLoading(btn, true, '<i class="bi bi-send-fill me-1"></i>Sending…');
+
+  let payload;
+  try { payload = JSON.parse(document.getElementById('payloadTextarea').value); }
+  catch { toast('Invalid JSON in the payload editor — fix it before sending', 'error'); setLoading(btn, false, '<i class="bi bi-send-fill me-1"></i>Send to Okta'); return; }
+
+  const isOidc = payload.signOnMode === 'OPENID_CONNECT';
 
   try {
-    const res = await post('/api/admin/create-app', adminParams({
-      label: val('appLabel'),
-      applicationType: val('appType'),
-      tokenEndpointAuthMethod: val('appAuthMethod'),
-      redirectUris: val('appRedirectUris').split('\n').map(s => s.trim()).filter(Boolean),
-      grantTypes
-    }));
+    const res = await fetch('/api/admin/create-app', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(adminParams({ ...payload, _rawPayload: true }))
+    }).then(r => r.json());
 
     document.getElementById('createAppOutput').style.display = '';
     document.getElementById('createAppStatus').innerHTML =
-      `${statusBadge(res.statusCode)}<span style="font-size:0.75rem;color:var(--text-muted);margin-left:8px">${res.durationMs}ms</span>`;
-    document.getElementById('createPayloadEl').textContent = JSON.stringify(res.payload, null, 2);
-    document.getElementById('createResponseEl').textContent = JSON.stringify(res.response, null, 2);
-    showCreateTab('payload');
+      `${statusBadge(res.statusCode)}<span style="font-size:0.75rem;color:var(--text-muted);margin-left:8px">${res.durationMs}ms</span>
+       ${res.success ? `<code style="font-size:0.75rem;color:var(--emerald);margin-left:8px">${escHtml(res.response?.id || '')}</code>` : ''}`;
+    document.getElementById('createResponseEl').textContent = JSON.stringify(res.response || res.error, null, 2);
+    showCreateTab('response');
 
     if (res.success) {
-      const cid = res.response?.credentials?.oauthClient?.client_id || res.response?.id;
-      toast(`App created! client_id: ${cid}`, 'success');
+      const appId = res.response.id;
+      const appName = payload.name; // 'oidc_client' or 'template_saml_2_0'
+      toast(`App created! ID: ${appId}`, 'success');
+
+      // Assign owner if set
+      const ownerLogin = val('appOwner');
+      if (ownerLogin) await assignAppOwner(appId, appName, ownerLogin);
     } else {
       toast('Creation failed: ' + (res.response?.errorSummary || `HTTP ${res.statusCode}`), 'error');
     }
   } catch (e) {
     toast('Error: ' + e.message, 'error');
   } finally {
-    setLoading(btn, false, '<i class="bi bi-plus-circle me-1"></i>Create App via API');
+    setLoading(btn, false, '<i class="bi bi-send-fill me-1"></i>Send to Okta');
   }
+}
+
+// ─── Owner assignment ──────────────────────────────────────────────────────────
+async function assignAppOwner(appId, appName, ownerLogin) {
+  showCreateTab('owner');
+  const resultEl = document.getElementById('ownerAssignmentResult');
+  const detailEl = document.getElementById('ownerAssignmentDetails');
+  resultEl.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Assigning ${escHtml(ownerLogin)} as APP_ADMIN for this app…`;
+
+  try {
+    const res = await fetch('/api/admin/assign-app-owner', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(adminParams({ login: ownerLogin, appId, appName }))
+    }).then(r => r.json());
+
+    if (res.success) {
+      resultEl.innerHTML = `<i class="bi bi-check-circle-fill me-2" style="color:var(--green)"></i>
+        <strong style="color:var(--green)">Owner assigned</strong> — ${escHtml(ownerLogin)} now has
+        <strong>APP_ADMIN</strong> role scoped to this application only (role ID: <code>${escHtml(res.roleId || '—')}</code>)`;
+      toast('App owner assigned successfully', 'success');
+    } else {
+      resultEl.innerHTML = `<i class="bi bi-exclamation-triangle-fill me-2" style="color:var(--yellow)"></i>
+        <strong style="color:var(--yellow)">Owner assignment failed</strong>: ${escHtml(res.error || `HTTP ${res.statusCode}`)}`;
+      toast('Owner assignment failed — see Owner Assignment tab', 'warning');
+    }
+
+    detailEl.textContent = JSON.stringify(res, null, 2);
+    detailEl.style.display = '';
+  } catch (e) {
+    resultEl.innerHTML = `<i class="bi bi-x-circle me-2" style="color:var(--red)"></i>${escHtml(e.message)}`;
+    toast('Owner assignment error: ' + e.message, 'error');
+  }
+}
+
+function showCreateTab(tab) {
+  ['response', 'owner'].forEach((t, i) => {
+    document.getElementById(`createTab${t.charAt(0).toUpperCase()+t.slice(1)}`).style.display = t===tab?'':'none';
+    document.querySelectorAll('#createAppTabs .tab-btn')[i].classList.toggle('active', t===tab);
+  });
 }
 
 async function exportApp() {
