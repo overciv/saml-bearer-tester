@@ -158,7 +158,15 @@ function createScopeManager(containerId, inputId, initial = []) {
     render();
   }, 0);
 
-  return { state, add, remove, render };
+  // Returns confirmed tags PLUS any text currently in the input (unconfirmed)
+  // so the user doesn't have to press Enter before clicking a submit button.
+  function getAll() {
+    const inputEl = document.getElementById(inputId);
+    const pending = (inputEl?.value || '').trim().split(/\s+/).filter(Boolean);
+    return [...new Set([...state.list, ...pending])];
+  }
+
+  return { state, add, remove, render, getAll };
 }
 
 // Global fields synced across all tester pages via oauthst-global AND config.json

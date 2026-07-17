@@ -128,7 +128,7 @@ async function exchangeToken() {
       authServerId: val('authServerId'),
       clientId: val('clientId'),
       clientAssertion,
-      scope: scopeMgr.state.list,
+      scope: scopeMgr.getAll(),
       grantType: val('grantType')
     });
 

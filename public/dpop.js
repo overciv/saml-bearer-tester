@@ -83,7 +83,7 @@ async function acquireToken() {
       authServerId: val('authServerId'),
       clientId: val('clientId'),
       clientSecret: val('clientSecret'),
-      scope: scopeMgr.state.list,
+      scope: scopeMgr.getAll(),
       grantType: val('grantType'),
       refreshToken: val('refreshToken'),
       privateJwk: jwks.privateJwk,

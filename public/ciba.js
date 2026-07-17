@@ -91,7 +91,7 @@ async function sendBackchannelRequest() {
       loginHint,
       idTokenHint,
       bindingMessage: val('bindingMessage'),
-      scope: scopeMgr.state.list,
+      scope: scopeMgr.getAll(),
       requestExpiry: parseInt(val('requestExpiry')) || 300,
       privateJwk
     });
@@ -104,7 +104,7 @@ async function sendBackchannelRequest() {
       currentAuthReqId = res.response.auth_req_id;
       pollIntervalSec = res.response.interval || 5;
       pollExpiresInSec = res.response.expires_in || 300;
-      currentScope = [...scopeMgr.state.list];
+      currentScope = [...scopeMgr.getAll()];
 
       document.getElementById('authReqId').value = currentAuthReqId;
       document.getElementById('pollIntervalDisplay').textContent = pollIntervalSec;
@@ -190,7 +190,7 @@ async function doPoll() {
       clientId: val('clientId'),
       clientSecret: isPkjwt ? undefined : (document.getElementById('clientSecret')?.value || ''),
       authReqId: currentAuthReqId,
-      scope: currentScope.length ? currentScope : scopeMgr.state.list,
+      scope: currentScope.length ? currentScope : scopeMgr.getAll(),
       privateJwk
     });
   } catch (e) {

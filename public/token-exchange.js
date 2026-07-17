@@ -83,7 +83,7 @@ async function performExchange() {
     privateJwk,
     subjectToken: val('subjectToken'),
     subjectTokenType: val('subjectTokenType'),
-    scope: scopeMgr.state.list,
+    scope: scopeMgr.getAll(),
     requestedTokenType: val('requestedTokenType') || undefined,
     audience: val('audience') || undefined,
     resource: val('resource') || undefined,
