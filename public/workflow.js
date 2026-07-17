@@ -52,7 +52,8 @@ const STEP_DEFS = {
   'dpop-token': {
     label:'DPoP Token', icon:'bi-fingerprint', color:'var(--blue)',
     bg:'rgba(88,166,255,0.08)',
-    inputs:[], outputs:['access_token','refresh_token'],
+    inputs:[{name:'refresh_token', accepts:['refresh_token']}],
+    outputs:['access_token','refresh_token'],
     configFields:[
       {k:'clientId',    label:'Client ID',         type:'text'},
       {k:'clientSecret',label:'Client Secret',     type:'password'},
@@ -1002,8 +1003,10 @@ async function executeStep(step, inputs, domain, sid) {
     }
 
     case 'dpop-token': {
-      const alg       = c.dpopAlg || 'ES256';
-      const grantType = c.grantType || 'client_credentials';
+      const alg         = c.dpopAlg || 'ES256';
+      const grantType   = c.grantType || 'client_credentials';
+      // Prefer bound input from a previous step, fall back to manual config field
+      const refreshToken = inputs.refresh_token || c.refreshToken;
       const kp = await fetch('/api/dpop/generate-keypair', {
         method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({alg})
       }).then(r=>r.json());
@@ -1014,7 +1017,7 @@ async function executeStep(step, inputs, domain, sid) {
           clientId:c.clientId, clientSecret:c.clientSecret,
           scope:(c.scope||'openid').split(/\s+/),
           grantType,
-          refreshToken: grantType === 'refresh_token' ? c.refreshToken : undefined,
+          refreshToken: grantType === 'refresh_token' ? refreshToken : undefined,
           privateJwk:kp.privateJwk, publicJwk:kp.publicJwk
         })
       }).then(r=>r.json());
