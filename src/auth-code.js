@@ -18,7 +18,7 @@ function _tokenEp(domain, sid) {
     : `https://${domain}/oauth2/v1/token`;
 }
 
-function startFlow({ oktaDomain, authServerId, clientId, redirectUri, scope }) {
+function startFlow({ oktaDomain, authServerId, clientId, redirectUri, scope, acrValues, maxAge }) {
   const verifier  = crypto.randomBytes(32).toString('base64url');
   const challenge = crypto.createHash('sha256').update(verifier).digest().toString('base64url');
   const state     = crypto.randomBytes(16).toString('hex');
@@ -40,6 +40,8 @@ function startFlow({ oktaDomain, authServerId, clientId, redirectUri, scope }) {
     code_challenge: challenge,
     code_challenge_method: 'S256'
   });
+  if (acrValues) params.set('acr_values', acrValues);
+  if (maxAge !== undefined) params.set('max_age', String(maxAge));
 
   const authUrl = `${_authorizeEp(oktaDomain, authServerId)}?${params}`;
   return { flowId, authUrl };

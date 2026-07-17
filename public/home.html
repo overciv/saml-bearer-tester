@@ -94,7 +94,7 @@
       </div>
     </div>
 
-    <!-- Token Tools + Admin -->
+    <!-- Token Tools + MFA + Admin -->
     <div class="col-lg-6">
       <div class="category-label">🔍 Token Tools</div>
       <div class="row g-2 mb-4">
@@ -102,6 +102,20 @@
           <div class="tool-icon" style="color:var(--amber)"><i class="bi bi-search"></i></div>
           <div class="tool-name">Token Inspector</div>
           <div class="tool-desc">RFC-annotated claim analysis, revocation + lifetime policies</div>
+        </a></div>
+        <div class="col-6"><a href="/step-up.html" class="tool-card" style="--accent:var(--blue)">
+          <div class="tool-icon" style="color:var(--blue)"><i class="bi bi-arrow-up-circle"></i></div>
+          <div class="tool-name">Step-Up Auth</div>
+          <div class="tool-desc">Test acr_values — request MFA upgrade, compare before/after token ACR claims</div>
+        </a></div>
+      </div>
+
+      <div class="category-label">🛡️ MFA Tools</div>
+      <div class="row g-2 mb-4">
+        <div class="col-6"><a href="/mfa.html" class="tool-card" style="--accent:var(--emerald)">
+          <div class="tool-icon" style="color:var(--emerald)"><i class="bi bi-shield-lock"></i></div>
+          <div class="tool-name">MFA Manager</div>
+          <div class="tool-desc">List enrolled factors, trigger live push/OTP/TOTP challenges for any user</div>
         </a></div>
       </div>
 

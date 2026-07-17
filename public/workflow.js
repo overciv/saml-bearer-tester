@@ -75,6 +75,39 @@ const STEP_DEFS = {
       {k:'scope',       label:'Scope',               type:'text', ph:'openid'},
     ]
   },
+  'mfa-list-factors': {
+    label:'MFA: List Factors', icon:'bi-shield-lock', color:'var(--emerald)',
+    bg:'rgba(61,203,122,0.1)',
+    inputs:[],
+    outputs:['user_id'],
+    configFields:[
+      {k:'userLogin',   label:'User Login/Email', type:'email', ph:'user@example.com'},
+      {k:'adminToken',  label:'Admin API Token',  type:'password', ph:'00YXSE_...'},
+    ]
+  },
+  'mfa-challenge': {
+    label:'MFA: Challenge', icon:'bi-shield-check', color:'var(--emerald)',
+    bg:'rgba(61,203,122,0.1)',
+    inputs:[{name:'user_id', accepts:['user_id']}],
+    outputs:['challenge_result'],
+    configFields:[
+      {k:'userLogin',   label:'User Login (if no input bound)', type:'email', ph:'user@example.com'},
+      {k:'factorType',  label:'Factor type to challenge',       type:'text', ph:'push (or leave empty for first active factor)'},
+      {k:'adminToken',  label:'Admin API Token', type:'password', ph:'00YXSE_...'},
+    ]
+  },
+  'step-up-auth': {
+    label:'Step-Up Auth', icon:'bi-arrow-up-circle', color:'var(--blue)',
+    bg:'rgba(88,166,255,0.12)',
+    inputs:[],
+    outputs:['access_token','id_token'],
+    configFields:[
+      {k:'clientId',   label:'Client ID',     type:'text'},
+      {k:'acrValues',  label:'ACR Values',    type:'text', def:'urn:okta:loa:2fa:any', ph:'urn:okta:loa:2fa:any'},
+      {k:'scope',      label:'Scope',         type:'text', ph:'openid profile email'},
+      {k:'redirectUri',label:'Redirect URI',  type:'text', def:'http://localhost:3000/oauth/callback'},
+    ]
+  },
   'token-inspect': {
     label:'Token Inspector', icon:'bi-search', color:'var(--amber)',
     bg:'rgba(227,179,65,0.1)',
@@ -485,6 +518,77 @@ async function executeStep(step, inputs, domain, sid) {
       }).then(r=>r.json());
       return { success:r.success, outputs:{ access_token:r.response?.access_token }, error:!r.success?(r.response?.error||`HTTP ${r.statusCode}`):null };
     }
+
+    case 'mfa-list-factors': {
+      const adminToken = c.adminToken || G().adminApiToken || '';
+      const login = inputs.user_id || c.userLogin;
+      if (!login) return { success:false, error:'user_id input or userLogin config required', outputs:{} };
+      const uRes = await fetch('/api/admin/find-user', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ oktaDomain:stepDomain, adminApiToken:adminToken, login })
+      }).then(r=>r.json());
+      if (!uRes.success) return { success:false, error:`User not found: HTTP ${uRes.statusCode}`, outputs:{} };
+      const userId = uRes.response.id;
+      const fRes = await fetch('/api/admin/list-factors', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ oktaDomain:stepDomain, adminApiToken:adminToken, userId })
+      }).then(r=>r.json());
+      const factors = fRes.response || [];
+      const summary = factors.map(f => `${f.factorType}/${f.status}`).join(', ') || 'none';
+      return { success:fRes.success, outputs:{ user_id:userId }, factorCount:factors.length, summary, error:!fRes.success?`HTTP ${fRes.statusCode}`:null };
+    }
+
+    case 'mfa-challenge': {
+      const adminToken = c.adminToken || G().adminApiToken || '';
+      const userId = inputs.user_id || c.userId;
+      if (!userId) {
+        // Try to find user by login if no user_id input
+        if (!c.userLogin) return { success:false, error:'Bind user_id from a previous step or set userLogin in config', outputs:{} };
+        const uRes = await fetch('/api/admin/find-user', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ oktaDomain:stepDomain, adminApiToken:adminToken, login:c.userLogin })
+        }).then(r=>r.json());
+        if (!uRes.success) return { success:false, error:`User not found`, outputs:{} };
+        // Recurse with resolved userId — put it in inputs
+        return await executeStep({ ...step, type:'mfa-challenge' }, { ...inputs, user_id: uRes.response.id }, stepDomain, sid);
+      }
+      // Get factors list to find one to challenge
+      const fRes = await fetch('/api/admin/list-factors', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ oktaDomain:stepDomain, adminApiToken:adminToken, userId })
+      }).then(r=>r.json());
+      const factors = (fRes.response || []).filter(f => f.status === 'ACTIVE');
+      const SUPPORTED = ['push','email','token:software:sms','token:software:totp','token:hardware'];
+      const target = c.factorType
+        ? factors.find(f => f.factorType.includes(c.factorType))
+        : factors.find(f => SUPPORTED.includes(f.factorType));
+      if (!target) return { success:false, error:'No challengeable active factor found', outputs:{} };
+
+      // Trigger challenge (push factors require polling)
+      const cRes = await fetch('/api/admin/factor-challenge', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ oktaDomain:stepDomain, adminApiToken:adminToken, userId, factorId:target.id })
+      }).then(r=>r.json());
+
+      if (target.factorType === 'push' && cRes.pollHref) {
+        // Poll up to 60s
+        for (let i=0; i<20; i++) {
+          await new Promise(r=>setTimeout(r,3000));
+          const p = await fetch('/api/admin/factor-poll', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ oktaDomain:stepDomain, adminApiToken:adminToken, pollHref:cRes.pollHref })
+          }).then(r=>r.json());
+          if (p.factorResult==='SUCCESS')  return { success:true, outputs:{ challenge_result:'approved' } };
+          if (p.factorResult==='REJECTED') return { success:false, error:'Push rejected by user', outputs:{ challenge_result:'rejected' } };
+          if (p.factorResult==='TIMEOUT')  return { success:false, error:'Push timed out', outputs:{ challenge_result:'timeout' } };
+        }
+        return { success:false, error:'Challenge timed out after 60s', outputs:{ challenge_result:'timeout' } };
+      }
+      return { success: cRes.success||false, outputs:{ challenge_result: cRes.factorResult||'unknown' }, error:!cRes.success?(cRes.error||`HTTP ${cRes.statusCode}`):null };
+    }
+
+    case 'step-up-auth':
+      return await execAuthCode({ ...step, config: { ...c, acrValues: c.acrValues } }, stepDomain, sid);
 
     case 'ciba': {
       const authRes = await fetch('/api/ciba/backchannel-authorize', {

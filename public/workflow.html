@@ -134,6 +134,20 @@
       <div><div class="ci-name">CIBA</div><div class="ci-desc">Push notification auth</div></div>
     </div>
 
+    <div class="cat-header">MFA &amp; Step-Up</div>
+    <div class="catalog-item" onclick="addStep('mfa-list-factors')" draggable="true" ondragstart="onCatalogDrag(event,'mfa-list-factors')">
+      <div class="ci-icon" style="background:rgba(61,203,122,0.1);color:var(--emerald)"><i class="bi bi-shield-lock"></i></div>
+      <div><div class="ci-name">MFA: List Factors</div><div class="ci-desc">Find user's enrolled factors</div></div>
+    </div>
+    <div class="catalog-item" onclick="addStep('mfa-challenge')" draggable="true" ondragstart="onCatalogDrag(event,'mfa-challenge')">
+      <div class="ci-icon" style="background:rgba(61,203,122,0.1);color:var(--emerald)"><i class="bi bi-shield-check"></i></div>
+      <div><div class="ci-name">MFA: Challenge</div><div class="ci-desc">Trigger push/OTP/TOTP challenge</div></div>
+    </div>
+    <div class="catalog-item" onclick="addStep('step-up-auth')" draggable="true" ondragstart="onCatalogDrag(event,'step-up-auth')">
+      <div class="ci-icon" style="background:rgba(88,166,255,0.12);color:var(--blue)"><i class="bi bi-arrow-up-circle"></i></div>
+      <div><div class="ci-name">Step-Up Auth</div><div class="ci-desc">acr_values — elevate assurance</div></div>
+    </div>
+
     <div class="cat-header">Token Tools</div>
     <div class="catalog-item" onclick="addStep('token-exchange')">
       <div class="ci-icon" style="background:rgba(247,129,102,0.1);color:var(--coral)"><i class="bi bi-arrow-left-right"></i></div>
