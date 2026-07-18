@@ -737,7 +737,7 @@ async function startEnrollment(type) {
   try {
     const res = await fetch('/api/admin/enroll-factor', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(adminP({ userId: currentUserId, factorType, provider }))
+      body: JSON.stringify(adminParams({ userId: currentUserId, factorType, provider }))
     }).then(r => r.json());
 
     if (!res.success) {
@@ -810,7 +810,7 @@ async function _runWebAuthnEnrollment(enrollResult) {
 
     const activateRes = await fetch('/api/admin/activate-factor', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(adminP({ activateUrl: enrollResult.activateHref, activationData }))
+      body: JSON.stringify(adminParams({ activateUrl: enrollResult.activateHref, activationData }))
     }).then(r => r.json());
 
     if (activateRes.success) {
@@ -840,7 +840,7 @@ function startPushPolling() {
 
     const res = await fetch('/api/admin/poll-factor-activation', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(adminP({ activationUrl: _enrollState.activationUrl }))
+      body: JSON.stringify(adminParams({ activationUrl: _enrollState.activationUrl }))
     }).then(r => r.json()).catch(() => null);
 
     if (!res) return;
