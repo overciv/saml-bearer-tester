@@ -741,7 +741,22 @@ async function startEnrollment(type) {
     }).then(r => r.json());
 
     if (!res.success) {
-      toast('Enrollment failed: ' + (res.response?.errorSummary || `HTTP ${res.statusCode}`), 'error');
+      const summary = res.response?.errorSummary || `HTTP ${res.statusCode}`;
+      const causes  = (res.response?.errorCauses || []).map(c => c.errorSummary).filter(Boolean).join(' | ');
+      toast('Enrollment failed: ' + summary + (causes ? ' — ' + causes : ''), 'error');
+      // Show expandable full error in the panel
+      const panel = document.getElementById(type === 'push' ? 'enrollPushPanel' : 'enrollWebAuthnPanel');
+      if (panel) {
+        panel.style.display = '';
+        panel.innerHTML += `<div style="color:var(--red);font-size:0.8rem;margin-top:8px">
+          <strong>❌ ${escHtml(summary)}</strong>
+          ${causes ? `<div style="color:var(--text-muted);font-size:0.75rem;margin-top:2px">${escHtml(causes)}</div>` : ''}
+          <details style="margin-top:6px"><summary style="cursor:pointer;font-size:0.72rem;color:var(--text-muted)">Full Okta response ▶</summary>
+            <div style="background:#0d1117;border-radius:6px;padding:8px;font-size:0.72rem;font-family:monospace;white-space:pre-wrap;margin-top:4px;color:#b5cea8">${escHtml(JSON.stringify(res.response, null, 2))}</div>
+          </details>
+          <button class="btn btn-outline-secondary btn-sm mt-2" onclick="cancelEnrollment()">Close</button>
+        </div>`;
+      }
       return;
     }
 

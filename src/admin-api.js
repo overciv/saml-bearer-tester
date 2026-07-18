@@ -188,10 +188,11 @@ async function deleteApp({ oktaDomain, adminApiToken, appId }) {
 
 async function enrollFactor({ oktaDomain, adminApiToken, userId, factorType, provider }) {
   const t0 = Date.now();
+  // activate=false: let the user complete enrollment (scan QR / tap security key)
+  // rather than Okta attempting immediate activation
+  const url = `https://${oktaDomain}/api/v1/users/${userId}/factors?activate=false`;
   try {
-    const r = await axios.post(
-      `https://${oktaDomain}/api/v1/users/${userId}/factors`,
-      { factorType, provider },
+    const r = await axios.post(url, { factorType, provider },
       { headers: json(adminApiToken), validateStatus: () => true }
     );
     const d = r.data;
