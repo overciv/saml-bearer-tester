@@ -186,4 +186,46 @@ async function deleteApp({ oktaDomain, adminApiToken, appId }) {
   return { success: del.status === 204, statusCode: del.status, steps };
 }
 
-module.exports = { createApp, getApp, cloneApp, findUser, listFactors, resetFactor, getSystemLog, assignAppOwner, deleteApp, factorChallenge, factorPoll };
+async function enrollFactor({ oktaDomain, adminApiToken, userId, factorType, provider }) {
+  const t0 = Date.now();
+  try {
+    const r = await axios.post(
+      `https://${oktaDomain}/api/v1/users/${userId}/factors`,
+      { factorType, provider },
+      { headers: json(adminApiToken), validateStatus: () => true }
+    );
+    const d = r.data;
+    return {
+      success: r.status < 300,
+      statusCode: r.status, durationMs: Date.now()-t0,
+      factorId:      d?.id,
+      // Push: QR code image URL + activation polling URL
+      qrCodeUrl:     d?._links?.activation?.qrcode?.href,
+      activationUrl: d?._links?.activation?.href,
+      // WebAuthn: challenge data + activate URL
+      webauthnActivation: d?._embedded?.activation,
+      activateHref:  d?._links?.activate?.href,
+      response: d
+    };
+  } catch (e) { return { success:false, statusCode:0, durationMs:Date.now()-t0, error:e.message }; }
+}
+
+async function activateFactor({ oktaDomain, adminApiToken, activateUrl, activationData }) {
+  const t0 = Date.now();
+  try {
+    const r = await axios.post(activateUrl, activationData,
+      { headers: json(adminApiToken), validateStatus: () => true });
+    return { success: r.status < 300, statusCode: r.status, durationMs: Date.now()-t0, response: r.data };
+  } catch (e) { return { success:false, statusCode:0, durationMs:Date.now()-t0, error:e.message }; }
+}
+
+async function pollFactorActivation({ adminApiToken, activationUrl }) {
+  const t0 = Date.now();
+  try {
+    const r = await axios.get(activationUrl,
+      { headers: plain(adminApiToken), validateStatus: () => true });
+    return { statusCode: r.status, durationMs: Date.now()-t0, factorResult: r.data?.factorResult, response: r.data };
+  } catch (e) { return { statusCode:0, factorResult:'ERROR', error:e.message }; }
+}
+
+module.exports = { createApp, getApp, cloneApp, findUser, listFactors, resetFactor, getSystemLog, assignAppOwner, deleteApp, factorChallenge, factorPoll, enrollFactor, activateFactor, pollFactorActivation };

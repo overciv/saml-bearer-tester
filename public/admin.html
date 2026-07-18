@@ -351,6 +351,59 @@
               </table>
             </div>
 
+            <!-- Enroll new factor -->
+            <div class="mt-3 pt-3" style="border-top:1px solid var(--border)">
+              <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span style="font-size:0.8rem;font-weight:600;color:var(--text-muted)">Enroll new factor:</span>
+                <button class="btn btn-sm" id="enrollPushBtn" onclick="startEnrollment('push')"
+                  style="color:var(--emerald);border:1px solid rgba(61,203,122,0.4);background:rgba(61,203,122,0.06)">
+                  <i class="bi bi-phone-vibrate me-1"></i>Okta Verify Push
+                </button>
+                <button class="btn btn-sm" id="enrollWebAuthnBtn" onclick="startEnrollment('webauthn')"
+                  style="color:var(--blue);border:1px solid rgba(88,166,255,0.3);background:rgba(88,166,255,0.06)">
+                  <i class="bi bi-fingerprint me-1"></i>FIDO2 / WebAuthn
+                </button>
+              </div>
+
+              <!-- Push enrollment panel -->
+              <div id="enrollPushPanel" class="mt-3 p-3" style="display:none;background:rgba(61,203,122,0.04);border:1px solid rgba(61,203,122,0.2);border-radius:8px">
+                <div style="font-size:0.82rem;font-weight:600;color:var(--emerald);margin-bottom:10px">
+                  <i class="bi bi-phone-vibrate me-1"></i>Enroll Okta Verify Push
+                </div>
+                <div id="enrollQrSection">
+                  <div style="font-size:0.8rem;color:var(--text-muted);margin-bottom:8px">
+                    Have the user scan this QR code with the <strong>Okta Verify</strong> app, then click the button below:
+                  </div>
+                  <div id="enrollQrWrap" style="display:inline-block;padding:8px;background:#fff;border-radius:8px;margin-bottom:10px">
+                    <img id="enrollQrCode" style="width:180px;height:180px;display:block" alt="QR Code">
+                  </div>
+                  <div class="d-flex gap-2">
+                    <button class="btn btn-primary btn-sm" onclick="startPushPolling()">
+                      <i class="bi bi-check2 me-1"></i>I've scanned it — activate
+                    </button>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="cancelEnrollment()">Cancel</button>
+                  </div>
+                </div>
+                <div id="enrollPushPolling" style="display:none">
+                  <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="spinner-border spinner-border-sm" style="color:var(--emerald)"></span>
+                    <span style="font-size:0.82rem" id="enrollPollMsg">Waiting for user to approve in Okta Verify…</span>
+                  </div>
+                  <button class="btn btn-outline-secondary btn-sm" onclick="cancelEnrollment()">Cancel</button>
+                </div>
+                <div id="enrollPushResult" style="display:none"></div>
+              </div>
+
+              <!-- WebAuthn enrollment panel -->
+              <div id="enrollWebAuthnPanel" class="mt-3 p-3" style="display:none;background:rgba(88,166,255,0.04);border:1px solid rgba(88,166,255,0.2);border-radius:8px">
+                <div style="font-size:0.82rem;font-weight:600;color:var(--blue);margin-bottom:8px">
+                  <i class="bi bi-fingerprint me-1"></i>Enroll FIDO2 / WebAuthn
+                </div>
+                <div id="enrollWebAuthnStatus" style="font-size:0.82rem;color:var(--text-muted)"></div>
+                <button class="btn btn-outline-secondary btn-sm mt-2" id="enrollWebAuthnCancelBtn" onclick="cancelEnrollment()" style="display:none">Cancel</button>
+              </div>
+            </div>
+
             <!-- Challenge panel (shown when a challenge is active) -->
             <div id="challengePanel" class="mt-3 p-3" style="display:none;background:rgba(61,203,122,0.05);border:1px solid rgba(61,203,122,0.2);border-radius:8px">
               <div class="d-flex align-items-center gap-2 mb-3">

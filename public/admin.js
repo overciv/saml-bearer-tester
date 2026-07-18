@@ -710,6 +710,171 @@ async function cloneApp() {
   }
 }
 
+// ─── Factor Enrollment ────────────────────────────────────────────────────────
+
+let _enrollState = { factorId: null, activationUrl: null, pollTimer: null };
+
+function _b64urlToBuffer(b64url) {
+  const b64 = b64url.replace(/-/g,'+').replace(/_/g,'/').padEnd(b64url.length + (4 - b64url.length % 4) % 4, '=');
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0)).buffer;
+}
+function _bufferToB64url(buffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buffer))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+
+async function startEnrollment(type) {
+  if (!_currentUserId) { toast('Find a user first', 'warning'); return; }
+
+  // Cancel any open panel
+  cancelEnrollment(true);
+
+  const factorType = type === 'push' ? 'push' : 'webauthn';
+  const provider   = type === 'push' ? 'OKTA'  : 'FIDO';
+
+  const enrollBtn = document.getElementById(type === 'push' ? 'enrollPushBtn' : 'enrollWebAuthnBtn');
+  setLoading(enrollBtn, true, enrollBtn.innerHTML);
+
+  try {
+    const res = await fetch('/api/admin/enroll-factor', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(adminP({ userId: _currentUserId, factorType, provider }))
+    }).then(r => r.json());
+
+    if (!res.success) {
+      toast('Enrollment failed: ' + (res.response?.errorSummary || `HTTP ${res.statusCode}`), 'error');
+      return;
+    }
+
+    _enrollState.factorId = res.factorId;
+
+    if (type === 'push') {
+      _enrollState.activationUrl = res.activationUrl;
+      document.getElementById('enrollPushPanel').style.display = '';
+      document.getElementById('enrollQrCode').src = res.qrCodeUrl || '';
+      document.getElementById('enrollQrSection').style.display = '';
+      document.getElementById('enrollPushPolling').style.display = 'none';
+      document.getElementById('enrollPushResult').style.display = 'none';
+      if (!res.qrCodeUrl) toast('No QR code URL in response — check Okta API response', 'warning');
+    } else {
+      document.getElementById('enrollWebAuthnPanel').style.display = '';
+      document.getElementById('enrollWebAuthnCancelBtn').style.display = '';
+      await _runWebAuthnEnrollment(res);
+    }
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  } finally {
+    setLoading(enrollBtn, false, enrollBtn.textContent.trim() ? enrollBtn.innerHTML : enrollBtn.innerHTML);
+  }
+}
+
+async function _runWebAuthnEnrollment(enrollResult) {
+  const panel = document.getElementById('enrollWebAuthnStatus');
+  const setStatus = (msg, color = 'var(--text-muted)') => { panel.innerHTML = `<span style="color:${color}">${escHtml(msg)}</span>`; };
+
+  if (!window.PublicKeyCredential) {
+    setStatus('❌ WebAuthn not supported in this browser', 'var(--red)');
+    return;
+  }
+
+  const activation = enrollResult.webauthnActivation;
+  if (!activation?.challenge) {
+    setStatus('❌ No WebAuthn challenge received from Okta. Check factorType=webauthn, provider=FIDO.', 'var(--red)');
+    return;
+  }
+
+  try {
+    setStatus('⏳ Browser security dialog opening — follow your device prompts…');
+
+    const credential = await navigator.credentials.create({
+      publicKey: {
+        challenge:          _b64urlToBuffer(activation.challenge),
+        rp:                 activation.rp || { id: location.hostname, name: 'Okta OAuth Super Tester' },
+        user: {
+          id:          _b64urlToBuffer(activation.user?.id || btoa(_currentUserId)),
+          name:        activation.user?.name    || document.getElementById('mfaUserLogin')?.value || 'user',
+          displayName: activation.user?.displayName || activation.user?.name || 'User'
+        },
+        pubKeyCredParams: activation.pubKeyCredParams || [{ type:'public-key', alg:-7 }, { type:'public-key', alg:-257 }],
+        timeout:           60000,
+        attestation:       'direct',
+        authenticatorSelection: { userVerification: 'preferred' }
+      }
+    });
+
+    setStatus('⏳ Activating with Okta…');
+
+    const activationData = {
+      attestation: _bufferToB64url(credential.response.attestationObject),
+      clientData:  _bufferToB64url(credential.response.clientDataJSON)
+    };
+
+    const activateRes = await fetch('/api/admin/activate-factor', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(adminP({ activateUrl: enrollResult.activateHref, activationData }))
+    }).then(r => r.json());
+
+    if (activateRes.success) {
+      setStatus('✅ FIDO2/WebAuthn factor enrolled successfully!', 'var(--green)');
+      document.getElementById('enrollWebAuthnCancelBtn').textContent = 'Close';
+      await refreshFactors();
+      toast('WebAuthn factor enrolled!', 'success');
+    } else {
+      setStatus('❌ Activation failed: ' + (activateRes.response?.errorSummary || `HTTP ${activateRes.statusCode}`), 'var(--red)');
+    }
+  } catch (e) {
+    const msg = e.name === 'NotAllowedError' ? 'User cancelled or timed out' : e.message;
+    setStatus('❌ ' + msg, 'var(--red)');
+  }
+}
+
+function startPushPolling() {
+  if (!_enrollState.activationUrl) return;
+  document.getElementById('enrollQrSection').style.display   = 'none';
+  document.getElementById('enrollPushPolling').style.display = '';
+
+  let attempts = 0;
+  _enrollState.pollTimer = setInterval(async () => {
+    attempts++;
+    document.getElementById('enrollPollMsg').textContent =
+      `Waiting for user to approve in Okta Verify… (attempt ${attempts})`;
+
+    const res = await fetch('/api/admin/poll-factor-activation', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify(adminP({ activationUrl: _enrollState.activationUrl }))
+    }).then(r => r.json()).catch(() => null);
+
+    if (!res) return;
+
+    // Activation success: HTTP 200 with no factorResult, or factorResult=SUCCESS
+    if ((res.statusCode === 200 && !res.factorResult) || res.factorResult === 'SUCCESS') {
+      clearInterval(_enrollState.pollTimer);
+      _enrollState.pollTimer = null;
+      document.getElementById('enrollPushPolling').style.display = 'none';
+      const el = document.getElementById('enrollPushResult');
+      el.style.display = '';
+      el.innerHTML = '<div style="color:var(--green);font-size:0.82rem">✅ Okta Verify Push enrolled successfully!</div><button class="btn btn-outline-secondary btn-sm mt-2" onclick="cancelEnrollment()">Close</button>';
+      await refreshFactors();
+      toast('Push factor enrolled!', 'success');
+    } else if (res.factorResult === 'TIMEOUT' || attempts >= 20) {
+      clearInterval(_enrollState.pollTimer);
+      _enrollState.pollTimer = null;
+      document.getElementById('enrollPushPolling').style.display = 'none';
+      const el = document.getElementById('enrollPushResult');
+      el.style.display = '';
+      el.innerHTML = '<div style="color:var(--yellow);font-size:0.82rem">⌛ Enrollment timed out — user did not scan in time</div><button class="btn btn-outline-secondary btn-sm mt-2" onclick="cancelEnrollment()">Close</button>';
+    }
+    // Continue polling on WAITING
+  }, 3000);
+}
+
+function cancelEnrollment(silent = false) {
+  if (_enrollState.pollTimer) { clearInterval(_enrollState.pollTimer); _enrollState.pollTimer = null; }
+  _enrollState = { factorId: null, activationUrl: null, pollTimer: null };
+  document.getElementById('enrollPushPanel').style.display     = 'none';
+  document.getElementById('enrollWebAuthnPanel').style.display = 'none';
+  if (!silent) toast('Enrollment cancelled', 'info');
+}
+
 // ─── MFA ───────────────────────────────────────────────────────────────────────
 async function findUser() {
   const btn = document.getElementById('findUserBtn');

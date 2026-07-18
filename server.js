@@ -11,7 +11,7 @@ const { backchannelAuthorize, pollToken } = require('./src/ciba');
 const { exchange: tokenExchange } = require('./src/token-exchange');
 const { revokeAndVerify, getTokenLifetime } = require('./src/token-inspector');
 const { startFlow, handleCallback, getFlowStatus, clientCredentials, resourceOwnerPassword } = require('./src/auth-code');
-const { createApp, getApp, cloneApp, findUser, listFactors, resetFactor, getSystemLog, assignAppOwner, deleteApp, factorChallenge, factorPoll } = require('./src/admin-api');
+const { createApp, getApp, cloneApp, findUser, listFactors, resetFactor, getSystemLog, assignAppOwner, deleteApp, factorChallenge, factorPoll, enrollFactor, activateFactor, pollFactorActivation } = require('./src/admin-api');
 const { getConfig, saveConfig, getSigningKey, generateSigningKey, getPublicJwks, getPublicConfig } = require('./src/config');
 const { requireAuth, loginHandler, callbackHandler, logoutHandler, meHandler } = require('./src/auth');
 
@@ -291,6 +291,18 @@ app.post('/api/admin/list-factors', async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.post('/api/admin/enroll-factor', async (req, res) => {
+  try { res.json(await enrollFactor(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/admin/activate-factor', async (req, res) => {
+  try { res.json(await activateFactor(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post('/api/admin/poll-factor-activation', async (req, res) => {
+  try { res.json(await pollFactorActivation(req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
 app.post('/api/admin/reset-factor', async (req, res) => {
   try { res.json(await resetFactor(req.body)); }
   catch (e) { res.status(500).json({ error: e.message }); }
