@@ -723,7 +723,7 @@ function _bufferToB64url(buffer) {
 }
 
 async function startEnrollment(type) {
-  if (!_currentUserId) { toast('Find a user first', 'warning'); return; }
+  if (!currentUserId) { toast('Find a user first', 'warning'); return; }
 
   // Cancel any open panel
   cancelEnrollment(true);
@@ -737,7 +737,7 @@ async function startEnrollment(type) {
   try {
     const res = await fetch('/api/admin/enroll-factor', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify(adminP({ userId: _currentUserId, factorType, provider }))
+      body: JSON.stringify(adminP({ userId: currentUserId, factorType, provider }))
     }).then(r => r.json());
 
     if (!res.success) {
@@ -790,7 +790,7 @@ async function _runWebAuthnEnrollment(enrollResult) {
         challenge:          _b64urlToBuffer(activation.challenge),
         rp:                 activation.rp || { id: location.hostname, name: 'Okta OAuth Super Tester' },
         user: {
-          id:          _b64urlToBuffer(activation.user?.id || btoa(_currentUserId)),
+          id:          _b64urlToBuffer(activation.user?.id || btoa(currentUserId)),
           name:        activation.user?.name    || document.getElementById('mfaUserLogin')?.value || 'user',
           displayName: activation.user?.displayName || activation.user?.name || 'User'
         },
