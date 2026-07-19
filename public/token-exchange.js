@@ -1,6 +1,6 @@
 'use strict';
 
-const CONFIG_FIELDS = ['oktaDomain', 'authServerId', 'clientId', 'clientSecret', 'clientAuthMethod'];
+const CONFIG_FIELDS = ['oktaDomain', 'authServerId', 'clientId', 'clientSecret', 'clientAuthMethod', 'clientPrivateJwk'];
 
 // Key claims to surface in the comparison view
 const COMPARE_CLAIMS = ['cid', 'iss', 'sub', 'aud', 'scp', 'scope', 'act', 'exp', 'iat', 'jti'];
