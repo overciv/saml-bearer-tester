@@ -371,8 +371,17 @@ function renderClaimsTable(payload) {
 // Renders the token type summary badges — 100% inline styles, no page-specific CSS classes.
 function renderTokenBadges(decoded) {
   const p = decoded.payload, h = decoded.header;
-  const isId      = h.typ === 'JWT' && (p.nonce !== undefined || p.at_hash !== undefined || p.c_hash !== undefined);
-  const isMachine = !p.uid;
+
+  // Primary differentiator: access tokens always carry `scp`; ID tokens never do.
+  const hasScopes   = p.scp !== undefined;
+  // OIDC-specific claims that only appear in ID tokens
+  const hasOidc     = p.amr !== undefined || p.at_hash !== undefined ||
+                      p.c_hash  !== undefined || p.nonce !== undefined ||
+                      p.auth_time !== undefined;
+  // ID Token: no scopes + has any OIDC marker, or no scopes + no uid/cid
+  const isId        = !hasScopes && (hasOidc || (!p.uid && !p.cid));
+  // Machine token: has scopes but no Okta user ID
+  const isMachine   = hasScopes && !p.uid;
   const hasDpop   = !!p.cnf?.jkt;
   const hasAct    = !!p.act;
 

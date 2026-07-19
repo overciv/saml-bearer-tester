@@ -725,7 +725,8 @@ function _tokenSummary(token) {
   const p = d.payload;
   const exp = p.exp ? new Date(p.exp * 1000) : null;
   return {
-    _type: p.uid ? 'User Token' : 'Machine (M2M)',
+    _type: (!p.scp && (p.amr||p.at_hash||p.auth_time||p.nonce||(!p.uid&&!p.cid))) ? 'ID Token'
+         : p.uid ? 'User Token' : 'Machine (M2M)',
     _dpop: !!p.cnf?.jkt,
     sub:   p.sub,
     cid:   p.cid,
@@ -766,7 +767,8 @@ function _renderStepResult(step) {
       <span class="result-val" style="color:${ok?'var(--green)':'var(--red)'}">${ok?'✓ Valid':'⚠ Expired'} · ${exp.toLocaleString()}</span>
     </div>` : '';
     const dpop = p.cnf?.jkt ? `<span style="color:#2dd9c6;font-size:0.68rem"> · DPoP-bound</span>` : '';
-    const typeLabel = p.uid ? 'User Token' : 'Machine Token (M2M)';
+    const typeLabel = (!p.scp && (p.amr||p.at_hash||p.auth_time||p.nonce||(!p.uid&&!p.cid)))
+      ? 'ID Token' : p.uid ? 'User Token' : 'Machine Token (M2M)';
     return `<div class="step-result">
       ${timing}<span style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--text-muted)">${typeLabel}${dpop}</span>
       ${rows}${expRow}
