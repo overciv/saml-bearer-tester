@@ -100,6 +100,70 @@ async function revokeToken() {
   }
 }
 
+// ─── Single Logout ────────────────────────────────────────────────────────────
+
+(function initSlo() {
+  function updateSloPreview() {
+    const domain = document.getElementById('sloOktaDomain')?.value?.trim();
+    const sid    = document.getElementById('sloAuthServerId')?.value?.trim();
+    const el     = document.getElementById('sloEndpointPreview');
+    if (!el) return;
+    el.textContent = domain
+      ? (sid ? `https://${domain}/oauth2/${sid}/v1/logout` : `https://${domain}/oauth2/v1/logout`)
+      : '—';
+  }
+  document.addEventListener('DOMContentLoaded', () => {
+    // Pre-fill from revoke section values (same domain)
+    const sync = () => {
+      ['sloOktaDomain', 'sloAuthServerId'].forEach((id, i) => {
+        const src = ['revOktaDomain', 'revAuthServerId'][i];
+        const el  = document.getElementById(id);
+        if (el && !el.value) el.value = document.getElementById(src)?.value || '';
+      });
+      updateSloPreview();
+    };
+    ['revOktaDomain','revAuthServerId'].forEach(id =>
+      document.getElementById(id)?.addEventListener('input', sync));
+    ['sloOktaDomain','sloAuthServerId'].forEach(id =>
+      document.getElementById(id)?.addEventListener('input', updateSloPreview));
+    sync();
+  });
+})();
+
+function performSingleLogout() {
+  const domain    = document.getElementById('sloOktaDomain')?.value?.trim();
+  const sid       = document.getElementById('sloAuthServerId')?.value?.trim();
+  const idToken   = document.getElementById('sloIdToken')?.value?.trim();
+  const redirectUri = document.getElementById('sloRedirectUri')?.value?.trim()
+                     || 'http://localhost:3001/home.html';
+
+  if (!domain)  { toast('Enter the Okta Domain first', 'warning'); return; }
+  if (!idToken) { toast('Paste the id_token in the ID Token field', 'warning'); return; }
+
+  const logoutUrl = sid
+    ? `https://${domain}/oauth2/${sid}/v1/logout`
+    : `https://${domain}/oauth2/v1/logout`;
+
+  // Browser submits a hidden form POST to Okta's logout endpoint.
+  // Okta clears the SSO session cookie, then redirects back to post_logout_redirect_uri.
+  const form = document.createElement('form');
+  form.method  = 'POST';
+  form.action  = logoutUrl;
+  form.style.display = 'none';
+
+  [['id_token_hint', idToken], ['post_logout_redirect_uri', redirectUri]].forEach(([name, value]) => {
+    const inp = document.createElement('input');
+    inp.type  = 'hidden';
+    inp.name  = name;
+    inp.value = value;
+    form.appendChild(inp);
+  });
+
+  document.body.appendChild(form);
+  toast('Logging out — Okta will redirect you back shortly…', 'info');
+  setTimeout(() => form.submit(), 400); // brief delay so the toast is visible
+}
+
 // ─── Token Lifetime ────────────────────────────────────────────────────────────
 async function fetchLifetime() {
   const btn = document.getElementById('lifetimeBtn');

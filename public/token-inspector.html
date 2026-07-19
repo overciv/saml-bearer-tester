@@ -119,6 +119,7 @@
         <div class="mb-3" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;font-weight:600;padding:0 12px;">Sections</div>
         <a href="#sec-inspect" class="step-link"><span class="step-num"><i class="bi bi-search" style="font-size:0.65rem"></i></span><span>Inspect Token</span></a>
         <a href="#sec-revoke" class="step-link"><span class="step-num"><i class="bi bi-x-circle" style="font-size:0.65rem"></i></span><span>Revoke &amp; Verify</span></a>
+        <a href="#sec-logout" class="step-link"><span class="step-num"><i class="bi bi-box-arrow-right" style="font-size:0.65rem"></i></span><span>Single Logout</span></a>
         <a href="#sec-lifetime" class="step-link"><span class="step-num"><i class="bi bi-clock" style="font-size:0.65rem"></i></span><span>Token Lifetime</span></a>
         <div style="margin:16px 12px 6px;font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">Type Legend</div>
         <div style="padding:0 12px;font-size:0.72rem;line-height:2.2">
@@ -197,6 +198,43 @@
             <hr style="border-color:var(--border)">
             <div id="revokeSteps"></div>
             <div id="revokeFinalStatus" class="mt-2 p-3" style="background:var(--surface2);border-radius:8px;font-size:0.82rem;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Single Logout -->
+      <div id="sec-logout" class="card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+          <div class="section-title"><i class="bi bi-box-arrow-right"></i>Single Logout (OIDC RP-Initiated)</div>
+          <button class="btn btn-warning btn-sm" id="sloBtn" onclick="performSingleLogout()">
+            <i class="bi bi-box-arrow-right me-1"></i>Logout &amp; Redirect
+          </button>
+        </div>
+        <div class="card-body p-4">
+          <div class="help-box mb-4">
+            Sends a <strong>POST</strong> to Okta's <code>/v1/logout</code> endpoint with the user's <code>id_token_hint</code>.
+            Okta terminates the browser session (SSO cookie), then redirects back to the app.
+            <br><br>
+            <strong>Note:</strong> this requires the <code>id_token</code> issued during authentication, not an
+            <code>access_token</code>. The browser submits the form directly to Okta — no server round-trip.
+          </div>
+          <div class="row g-3">
+            <div class="col-md-6"><label class="form-label">Okta Domain *</label><input type="text" id="sloOktaDomain" class="form-control" placeholder="yourorg.okta.com"></div>
+            <div class="col-md-6"><label class="form-label">Authorization Server ID</label><input type="text" id="sloAuthServerId" class="form-control" placeholder="Leave empty for org-level"></div>
+            <div class="col-12">
+              <label class="form-label">ID Token (<code>id_token_hint</code>) *</label>
+              <textarea id="sloIdToken" class="form-control code-area" rows="2" placeholder="eyJraWQ... (paste id_token here)"></textarea>
+              <div class="input-hint">The id_token received during the last authentication. Tells Okta which session to terminate.</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label">Post-logout Redirect URI</label>
+              <input type="text" id="sloRedirectUri" class="form-control" value="http://localhost:3001/home.html">
+              <div class="input-hint">Where Okta redirects the browser after session termination. Must be registered in the Okta app.</div>
+            </div>
+          </div>
+          <div class="mt-3 p-3" style="background:var(--surface2);border-radius:8px;font-size:0.8rem;">
+            <span style="color:var(--text-muted)">Logout endpoint: </span>
+            <span id="sloEndpointPreview" style="color:var(--orange);font-family:monospace;font-size:0.75rem;">—</span>
           </div>
         </div>
       </div>
