@@ -140,6 +140,9 @@
             <div id="tTabId" style="display:none"><div id="idDecoded"></div></div>
             <div id="tTabRaw" style="display:none"><div class="position-relative"><div class="code-block json" id="rawResponse"></div><button class="btn btn-outline-secondary btn-sm copy-btn" onclick="copyCode('rawResponse')"><i class="bi bi-clipboard"></i></button></div></div>
             <div class="mt-3 d-flex gap-2 flex-wrap">
+              <button class="btn btn-outline-secondary btn-sm" onclick="exportToTokenInspector()" title="Pre-fill the token field in the Token Inspector">
+                <i class="bi bi-search me-1"></i>Export to Token Inspector
+              </button>
               <button class="btn btn-outline-secondary btn-sm" onclick="exportToTokenExchange()" title="Pre-fill the subject_token field in the Token Exchange tester">
                 <i class="bi bi-arrow-left-right me-1"></i>Export to Token Exchange
               </button>

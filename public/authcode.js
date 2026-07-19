@@ -132,6 +132,13 @@ function showTTab(tab) {
   });
 }
 
+function exportToTokenInspector() {
+  if (!_lastAccessToken) { toast('No access_token yet — authorize first', 'warning'); return; }
+  sessionStorage.setItem('authcode-export-inspect-token', _lastAccessToken);
+  toast('Exporting to Token Inspector…', 'info');
+  setTimeout(() => window.location.href = '/token-inspector.html', 400);
+}
+
 function exportToTokenExchange() {
   if (!_lastAccessToken) { toast('No access_token yet — authorize first', 'warning'); return; }
   sessionStorage.setItem('authcode-export-access-token', _lastAccessToken);

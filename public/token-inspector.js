@@ -13,6 +13,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (s.clientSecret)  document.getElementById('revClientSecret').value = s.clientSecret;
     if (s.adminApiToken) document.getElementById('ltAdminToken').value = s.adminApiToken;
   }).catch(() => {});
+
+  // Auto-fill when exported from the Auth Code tester
+  const exported = sessionStorage.getItem('authcode-export-inspect-token');
+  if (exported) {
+    sessionStorage.removeItem('authcode-export-inspect-token');
+    document.getElementById('inspectTokenInput').value = exported;
+    inspectToken(); // run the RFC analysis immediately
+    toast('access_token imported from Auth Code tester', 'success');
+  }
 });
 
 // ─── Token Inspect ─────────────────────────────────────────────────────────────
