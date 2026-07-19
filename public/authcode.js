@@ -3,6 +3,7 @@ const CONFIG_FIELDS = ['oktaDomain','authServerId','clientId','redirectUri','sco
 let currentFlowId = null;
 let pollTimer = null;
 let _lastAccessToken = null;
+let _lastTokens = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   window._pageSave = () => savePageConfig('authcode', CONFIG_FIELDS);
@@ -99,6 +100,7 @@ function handleCallbackResult(data) {
     document.getElementById('tokenResultStatus').innerHTML =
       `<span class="status-badge status-ok"><i class="bi bi-check-circle me-1"></i>Tokens received</span>`;
 
+    _lastTokens = data.tokens;
     if (data.tokens.access_token) {
       _lastAccessToken = data.tokens.access_token;
       document.getElementById('accessDecoded').innerHTML = renderJwtDecoded(data.tokens.access_token, 'Access Token');
@@ -133,9 +135,16 @@ function showTTab(tab) {
 }
 
 function exportToTokenInspector() {
-  if (!_lastAccessToken) { toast('No access_token yet — authorize first', 'warning'); return; }
-  sessionStorage.setItem('authcode-export-inspect-token', _lastAccessToken);
-  toast('Exporting to Token Inspector…', 'info');
+  if (!_lastTokens) { toast('No tokens yet — authorize first', 'warning'); return; }
+  // Pick the token matching the currently visible tab
+  const tabs = document.querySelectorAll('#tokenTabs .tab-btn');
+  const activeIdx = Array.from(tabs).findIndex(t => t.classList.contains('active'));
+  const token = activeIdx === 1 ? _lastTokens.id_token  // ID Token tab
+               : _lastTokens.access_token;              // Access Token tab (default)
+  const name  = activeIdx === 1 ? 'id_token' : 'access_token';
+  if (!token) { toast(`No ${name} available`, 'warning'); return; }
+  sessionStorage.setItem('authcode-export-inspect-token', token);
+  toast(`Exporting ${name} to Token Inspector…`, 'info');
   setTimeout(() => window.location.href = '/token-inspector.html', 400);
 }
 
