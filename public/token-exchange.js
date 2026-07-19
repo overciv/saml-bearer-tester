@@ -17,6 +17,15 @@ document.addEventListener('DOMContentLoaded', () => {
   scopeMgr = createScopeManager('scopeTags', 'scopeInput', ['openid']);
   setupEndpointPreview();
   toggleAuthMethod();
+
+  // Auto-fill subject_token when exported from the Auth Code tester
+  const exported = sessionStorage.getItem('authcode-export-access-token');
+  if (exported) {
+    sessionStorage.removeItem('authcode-export-access-token');
+    document.getElementById('subjectToken').value = exported;
+    decodeSubjectToken(); // show inline decode preview immediately
+    toast('access_token imported from Auth Code tester — ready to exchange', 'success');
+  }
 });
 
 function setupEndpointPreview() {

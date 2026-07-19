@@ -99,6 +99,7 @@ function handleCallbackResult(data) {
       `<span class="status-badge status-ok"><i class="bi bi-check-circle me-1"></i>Tokens received</span>`;
 
     if (data.tokens.access_token) {
+      _lastAccessToken = data.tokens.access_token;
       document.getElementById('accessDecoded').innerHTML = renderJwtDecoded(data.tokens.access_token, 'Access Token');
     }
     if (data.tokens.id_token) {
@@ -128,6 +129,13 @@ function showTTab(tab) {
     document.getElementById(`tTab${t.charAt(0).toUpperCase()+t.slice(1)}`).style.display = t===tab?'':'none';
     document.querySelectorAll('#tokenTabs .tab-btn')[i].classList.toggle('active', t===tab);
   });
+}
+
+function exportToTokenExchange() {
+  if (!_lastAccessToken) { toast('No access_token yet — authorize first', 'warning'); return; }
+  sessionStorage.setItem('authcode-export-access-token', _lastAccessToken);
+  toast('Exporting to Token Exchange…', 'info');
+  setTimeout(() => window.location.href = '/token-exchange.html', 400);
 }
 
 function exportToWorkflow() {
