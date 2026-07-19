@@ -61,7 +61,7 @@ async function loginHandler(req, res) {
 
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: cfg.redirectUri || 'http://localhost:3000/auth/callback',
+    redirect_uri: cfg.redirectUri || 'http://localhost:3001/auth/callback',
     response_type: 'code',
     scope: (cfg.authScopes || ['openid', 'profile', 'email']).join(' '),
     state,
@@ -94,7 +94,7 @@ async function callbackHandler(req, res) {
   const cfg = getConfig();
   const clientId = cfg.authClientId?.trim() || cfg.clientId;
   const ep = tokenEndpoint(cfg);
-  const redirectUri = cfg.redirectUri || 'http://localhost:3000/auth/callback';
+  const redirectUri = cfg.redirectUri || 'http://localhost:3001/auth/callback';
 
   try {
     const signingKey = await getSigningKey();
@@ -169,7 +169,7 @@ function logoutHandler(req, res) {
   if (cfg.oktaDomain && idToken) {
     const params = new URLSearchParams({
       id_token_hint: idToken,
-      post_logout_redirect_uri: 'http://localhost:3000/'
+      post_logout_redirect_uri: 'http://localhost:3001/'
     });
     return res.redirect(`${logoutEndpoint(cfg)}?${params}`);
   }

@@ -90,7 +90,7 @@ async function saveSettings() {
     authEnabled: document.getElementById('authEnabled').checked,
     authClientId: val('authClientId'),
     authScopes,
-    redirectUri: val('redirectUri') || 'http://localhost:3000/auth/callback'
+    redirectUri: val('redirectUri') || 'http://localhost:3001/auth/callback'
   };
 
   // Save to localStorage

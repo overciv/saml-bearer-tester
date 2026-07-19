@@ -371,7 +371,7 @@ app.post('/api/introspect', async (req, res) => {
 
 (async () => {
   await getSigningKey();  // generate on first run
-  const PORT = process.env.PORT || 3000;
+  const PORT = process.env.PORT || 3001;
   app.listen(PORT, () => {
     console.log(`\n⚡ Okta OAuth Super Tester  →  http://localhost:${PORT}`);
     console.log(`   SAML        →  http://localhost:${PORT}/`);

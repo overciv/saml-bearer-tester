@@ -138,7 +138,7 @@
         </div>
         <div class="col-md-6">
           <label class="form-label">Redirect URI</label>
-          <input type="text" id="redirectUri" class="form-control" value="http://localhost:3000/auth/callback">
+          <input type="text" id="redirectUri" class="form-control" value="http://localhost:3001/auth/callback">
         </div>
         <div class="col-12">
           <label class="form-label">Scopes</label>
@@ -197,7 +197,7 @@
 
       <div class="p-3" style="background:var(--surface2);border-radius:8px;font-size:0.8rem;">
         <span style="color:var(--text-muted)">JWKS URL (for dynamic registration): </span>
-        <code id="jwksUrl" style="color:var(--orange);font-size:0.75rem">http://localhost:3000/auth/jwks</code>
+        <code id="jwksUrl" style="color:var(--orange);font-size:0.75rem">http://localhost:3001/auth/jwks</code>
         <button class="btn btn-outline-secondary btn-sm ms-2" onclick="copyRaw(document.getElementById('jwksUrl').textContent)"><i class="bi bi-clipboard"></i></button>
         <div class="mt-1" style="color:var(--text-muted);font-size:0.72rem">Okta can fetch the JWKS from this URL (requires the app to be accessible from Okta's servers)</div>
       </div>

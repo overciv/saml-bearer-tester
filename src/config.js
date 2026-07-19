@@ -18,7 +18,7 @@ const DEFAULTS = {
   authEnabled: false,
   authClientId: '',
   authScopes: ['openid', 'profile', 'email'],
-  redirectUri: 'http://localhost:3000/auth/callback',
+  redirectUri: 'http://localhost:3001/auth/callback',
   sessionSecret: uuidv4()
 };
 

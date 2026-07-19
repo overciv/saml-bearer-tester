@@ -62,7 +62,7 @@ async function _doAuth(acrValues, target, maxAge) {
 
   const body = {
     oktaDomain: val('oktaDomain'), authServerId: val('authServerId'),
-    clientId: val('clientId'), redirectUri: val('redirectUri') || 'http://localhost:3000/oauth/callback',
+    clientId: val('clientId'), redirectUri: val('redirectUri') || 'http://localhost:3001/oauth/callback',
     scope: val('scope') || 'openid profile email',
     clientAuthMethod: authMethod,
     clientSecret: authMethod === 'basic' ? (document.getElementById('clientSecret')?.value || '') : undefined,

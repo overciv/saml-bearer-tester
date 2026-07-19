@@ -37,7 +37,7 @@ function startFlow({ oktaDomain, authServerId, clientId, redirectUri, scope, acr
 
   const params = new URLSearchParams({
     client_id: clientId,
-    redirect_uri: redirectUri || 'http://localhost:3000/oauth/callback',
+    redirect_uri: redirectUri || 'http://localhost:3001/oauth/callback',
     response_type: 'code',
     scope: scopes,
     state,
@@ -68,7 +68,7 @@ async function handleCallback({ code, state, error, error_description }) {
   const params = new URLSearchParams({
     grant_type:    'authorization_code',
     code,
-    redirect_uri:  flow.redirectUri || 'http://localhost:3000/oauth/callback',
+    redirect_uri:  flow.redirectUri || 'http://localhost:3001/oauth/callback',
     code_verifier: flow.verifier,
   });
 

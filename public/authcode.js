@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function setupAutoFill() {
   const ri = document.getElementById('redirectUri');
-  if (!ri.value) ri.value = 'http://localhost:3000/oauth/callback';
+  if (!ri.value) ri.value = 'http://localhost:3001/oauth/callback';
 }
 
 function toggleClientAuth() {
@@ -42,7 +42,7 @@ async function startAuth() {
       oktaDomain: val('oktaDomain'),
       authServerId: val('authServerId'),
       clientId: val('clientId'),
-      redirectUri: val('redirectUri') || 'http://localhost:3000/oauth/callback',
+      redirectUri: val('redirectUri') || 'http://localhost:3001/oauth/callback',
       scope: val('scope') || 'openid profile email',
       clientAuthMethod: authMethod,
       clientSecret: authMethod === 'basic' ? (document.getElementById('clientSecret')?.value || '') : undefined,

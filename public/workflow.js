@@ -10,7 +10,7 @@ const STEP_DEFS = {
     configFields:[
       {k:'clientId',        label:'Client ID',         type:'text',     ph:'0oa...'},
       {k:'scope',           label:'Scope',             type:'text',     ph:'openid profile email'},
-      {k:'redirectUri',     label:'Redirect URI',      type:'text',     def:'http://localhost:3000/oauth/callback'},
+      {k:'redirectUri',     label:'Redirect URI',      type:'text',     def:'http://localhost:3001/oauth/callback'},
       {k:'clientAuthMethod',label:'Client Auth',       type:'select',   options:[
         {value:'none',  label:'None (public client)'},
         {value:'basic', label:'Client Secret (Basic)'},
@@ -136,7 +136,7 @@ const STEP_DEFS = {
       {k:'clientId',   label:'Client ID',     type:'text'},
       {k:'acrValues',  label:'ACR Values',    type:'text', def:'urn:okta:loa:2fa:any', ph:'urn:okta:loa:2fa:any'},
       {k:'scope',      label:'Scope',         type:'text', ph:'openid profile email'},
-      {k:'redirectUri',label:'Redirect URI',  type:'text', def:'http://localhost:3000/oauth/callback'},
+      {k:'redirectUri',label:'Redirect URI',  type:'text', def:'http://localhost:3001/oauth/callback'},
     ]
   },
   'token-inspect': {
@@ -1154,7 +1154,7 @@ async function executeStep(step, inputs, domain, sid) {
 
 async function execAuthCode(step, domain, sid) {
   const c = step.config;
-  const redirectUri = c.redirectUri || 'http://localhost:3000/oauth/callback';
+  const redirectUri = c.redirectUri || 'http://localhost:3001/oauth/callback';
 
   const authMethod = c.clientAuthMethod || 'none';
   let privateJwk;
