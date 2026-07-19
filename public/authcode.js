@@ -2,6 +2,7 @@
 const CONFIG_FIELDS = ['oktaDomain','authServerId','clientId','redirectUri','scope','clientAuthMethod','clientSecret'];
 let currentFlowId = null;
 let pollTimer = null;
+let _lastAccessToken = null;
 
 document.addEventListener('DOMContentLoaded', () => {
   window._pageSave = () => savePageConfig('authcode', CONFIG_FIELDS);
