@@ -1,6 +1,6 @@
 'use strict';
 
-const CONFIG_FIELDS = ['oktaDomain','authServerId','clientId','pkjwtAlg','validitySeconds'];
+const CONFIG_FIELDS = ['oktaDomain','authServerId','clientId','pkjwtAlg','validitySeconds','privateJwk','jwksOutput'];
 let scopeMgr;
 let currentAssertion = null;
 let currentPublicJwk = null;
