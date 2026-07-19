@@ -1,5 +1,5 @@
 'use strict';
-const CONFIG_FIELDS = ['oktaDomain','authServerId','clientId','redirectUri','scope','clientAuthMethod','clientSecret'];
+const CONFIG_FIELDS = ['oktaDomain','authServerId','clientId','redirectUri','scope','clientAuthMethod','clientSecret','clientPrivateJwk'];
 let currentFlowId = null;
 let pollTimer = null;
 let _lastAccessToken = null;
