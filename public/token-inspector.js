@@ -143,33 +143,22 @@ function performSingleLogout() {
   if (!domain)  { toast('Enter the Okta Domain first', 'warning'); return; }
   if (!idToken) { toast('Paste the id_token in the ID Token field', 'warning'); return; }
 
-  const logoutUrl = sid
+  const base = sid
     ? `https://${domain}/oauth2/${sid}/v1/logout`
     : `https://${domain}/oauth2/v1/logout`;
 
-  // Browser submits a hidden form POST to Okta's logout endpoint.
-  // Okta terminates the session, then embeds hidden iframes for each app that has
-  // participateSlo:true + frontchannel_logout_uri configured, before redirecting back.
-  const form = document.createElement('form');
-  form.method        = 'POST';
-  form.action        = logoutUrl;
-  form.style.display = 'none';
-
-  [
-    ['id_token_hint',          idToken    ],
-    ['post_logout_redirect_uri', redirectUri],
-    ['state',                  state      ],
-  ].forEach(([name, value]) => {
-    const inp = document.createElement('input');
-    inp.type  = 'hidden';
-    inp.name  = name;
-    inp.value = value;
-    form.appendChild(inp);
+  // GET redirect — the canonical OIDC RP-Initiated Logout format.
+  // Parameters go in the query string. Okta uses GET to identify the session,
+  // trigger front-channel SLO iframes for participating apps, then redirect back.
+  const params = new URLSearchParams({
+    id_token_hint:           idToken,
+    post_logout_redirect_uri: redirectUri,
+    state,
   });
+  const logoutUrl = `${base}?${params}`;
 
-  document.body.appendChild(form);
-  toast('Logging out — Okta will fire cross-app SLO iframes then redirect back…', 'info');
-  setTimeout(() => form.submit(), 400);
+  toast('Logging out via GET — Okta will fire cross-app SLO iframes then redirect back…', 'info');
+  setTimeout(() => { window.location.href = logoutUrl; }, 400);
 }
 
 // ─── Token Lifetime ────────────────────────────────────────────────────────────

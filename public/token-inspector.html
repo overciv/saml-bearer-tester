@@ -212,9 +212,9 @@
         </div>
         <div class="card-body p-4">
           <div class="help-box mb-4">
-            Sends a <strong>POST</strong> to Okta's <code>/v1/logout</code> endpoint. Okta terminates the SSO session,
-            then — for each app that has <strong>SLO enabled</strong> — embeds a hidden iframe loading that app's
-            <code>frontchannel_logout_uri</code>. Only after all iframes have fired does Okta redirect back to the app.
+            Redirects the browser to Okta's <code>/v1/logout</code> endpoint via <strong>GET</strong> (canonical OIDC RP-Initiated Logout).
+            Okta terminates the SSO session, then — for each app that has <strong>SLO enabled</strong> — embeds a hidden iframe
+            loading that app's <code>frontchannel_logout_uri</code>. Only after all iframes have fired does Okta redirect back to the app.
           </div>
           <div class="warn-box mb-4" style="background:rgba(210,153,34,0.05);border:1px solid rgba(210,153,34,0.25);border-radius:8px;padding:12px 14px;font-size:0.8rem;color:var(--text-muted)">
             <strong style="color:var(--yellow)">⚠️ For cross-app SLO to propagate, each participating OIDC app must be configured:</strong>
