@@ -131,11 +131,14 @@ async function revokeToken() {
 })();
 
 function performSingleLogout() {
-  const domain    = document.getElementById('sloOktaDomain')?.value?.trim();
-  const sid       = document.getElementById('sloAuthServerId')?.value?.trim();
-  const idToken   = document.getElementById('sloIdToken')?.value?.trim();
+  const domain      = document.getElementById('sloOktaDomain')?.value?.trim();
+  const sid         = document.getElementById('sloAuthServerId')?.value?.trim();
+  const idToken     = document.getElementById('sloIdToken')?.value?.trim();
   const redirectUri = document.getElementById('sloRedirectUri')?.value?.trim()
                      || 'http://localhost:3001/home.html';
+  // state is required by OIDC RP-Initiated Logout spec — auto-generate if not provided
+  const state       = document.getElementById('sloState')?.value?.trim()
+                     || crypto.randomUUID().replace(/-/g, '').slice(0, 16);
 
   if (!domain)  { toast('Enter the Okta Domain first', 'warning'); return; }
   if (!idToken) { toast('Paste the id_token in the ID Token field', 'warning'); return; }
@@ -145,13 +148,18 @@ function performSingleLogout() {
     : `https://${domain}/oauth2/v1/logout`;
 
   // Browser submits a hidden form POST to Okta's logout endpoint.
-  // Okta clears the SSO session cookie, then redirects back to post_logout_redirect_uri.
+  // Okta terminates the session, then embeds hidden iframes for each app that has
+  // participateSlo:true + frontchannel_logout_uri configured, before redirecting back.
   const form = document.createElement('form');
-  form.method  = 'POST';
-  form.action  = logoutUrl;
+  form.method        = 'POST';
+  form.action        = logoutUrl;
   form.style.display = 'none';
 
-  [['id_token_hint', idToken], ['post_logout_redirect_uri', redirectUri]].forEach(([name, value]) => {
+  [
+    ['id_token_hint',          idToken    ],
+    ['post_logout_redirect_uri', redirectUri],
+    ['state',                  state      ],
+  ].forEach(([name, value]) => {
     const inp = document.createElement('input');
     inp.type  = 'hidden';
     inp.name  = name;
@@ -160,8 +168,8 @@ function performSingleLogout() {
   });
 
   document.body.appendChild(form);
-  toast('Logging out — Okta will redirect you back shortly…', 'info');
-  setTimeout(() => form.submit(), 400); // brief delay so the toast is visible
+  toast('Logging out — Okta will fire cross-app SLO iframes then redirect back…', 'info');
+  setTimeout(() => form.submit(), 400);
 }
 
 // ─── Token Lifetime ────────────────────────────────────────────────────────────

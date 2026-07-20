@@ -212,11 +212,19 @@
         </div>
         <div class="card-body p-4">
           <div class="help-box mb-4">
-            Sends a <strong>POST</strong> to Okta's <code>/v1/logout</code> endpoint with the user's <code>id_token_hint</code>.
-            Okta terminates the browser session (SSO cookie), then redirects back to the app.
-            <br><br>
-            <strong>Note:</strong> this requires the <code>id_token</code> issued during authentication, not an
-            <code>access_token</code>. The browser submits the form directly to Okta — no server round-trip.
+            Sends a <strong>POST</strong> to Okta's <code>/v1/logout</code> endpoint. Okta terminates the SSO session,
+            then — for each app that has <strong>SLO enabled</strong> — embeds a hidden iframe loading that app's
+            <code>frontchannel_logout_uri</code>. Only after all iframes have fired does Okta redirect back to the app.
+          </div>
+          <div class="warn-box mb-4" style="background:rgba(210,153,34,0.05);border:1px solid rgba(210,153,34,0.25);border-radius:8px;padding:12px 14px;font-size:0.8rem;color:var(--text-muted)">
+            <strong style="color:var(--yellow)">⚠️ For cross-app SLO to propagate, each participating OIDC app must be configured:</strong>
+            <ol style="margin:8px 0 0;padding-left:1.3rem;line-height:1.9">
+              <li>Set <code>participateSlo: true</code> in <code>settings.oauthClient</code> (via <code>PUT /api/v1/apps/{id}</code>)</li>
+              <li>Set <code>frontchannel_logout_uri</code> to a URL in that app that invalidates the session</li>
+              <li>Optionally set <code>frontchannel_logout_session_required: true</code> so Okta appends <code>sid</code>+<code>iss</code> to scope the logout to a specific session</li>
+            </ol>
+            Okta uses <strong>hidden iframes</strong> to POST to each app's <code>frontchannel_logout_uri</code> before redirecting back.
+            Check <code>user.session.end</code> in the System Log — the <code>TotalOidcLogoutRequests</code> debug field shows how many apps received the notification.
           </div>
           <div class="row g-3">
             <div class="col-md-6"><label class="form-label">Okta Domain *</label><input type="text" id="sloOktaDomain" class="form-control" placeholder="yourorg.okta.com"></div>
@@ -224,12 +232,17 @@
             <div class="col-12">
               <label class="form-label">ID Token (<code>id_token_hint</code>) *</label>
               <textarea id="sloIdToken" class="form-control code-area" rows="2" placeholder="eyJraWQ... (paste id_token here)"></textarea>
-              <div class="input-hint">The id_token received during the last authentication. Tells Okta which session to terminate.</div>
+              <div class="input-hint">The id_token from the user's session. Tells Okta which session to end. Must contain the <code>sid</code> claim.</div>
             </div>
-            <div class="col-12">
+            <div class="col-md-8">
               <label class="form-label">Post-logout Redirect URI</label>
               <input type="text" id="sloRedirectUri" class="form-control" value="http://localhost:3001/home.html">
-              <div class="input-hint">Where Okta redirects the browser after session termination. Must be registered in the Okta app.</div>
+              <div class="input-hint">Where Okta redirects after terminating all sessions. Must be registered in the Okta app.</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">State <span style="color:var(--text-muted)">(auto-generated if empty)</span></label>
+              <input type="text" id="sloState" class="form-control" placeholder="random nonce">
+              <div class="input-hint">Required by OIDC RP-Initiated Logout spec. Returned in the redirect.</div>
             </div>
           </div>
           <div class="mt-3 p-3" style="background:var(--surface2);border-radius:8px;font-size:0.8rem;">
