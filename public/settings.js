@@ -76,33 +76,32 @@ function renderSigningKey(signingKey) {
 
 async function saveSettings() {
   const btn = document.getElementById('saveBtn');
-  setLoading(btn, true, '<i class="bi bi-floppy me-1"></i>Save Settings');
+  if (btn) setLoading(btn, true, '<i class="bi bi-floppy me-1"></i>Save Settings');
 
   const scopesRaw = val('authScopes') || 'openid profile email';
   const authScopes = scopesRaw.split(/\s+/).filter(Boolean);
 
   const payload = {
-    oktaDomain: val('oktaDomain'),
-    authServerId: val('authServerId'),
-    clientId: val('clientId'),
-    clientSecret: document.getElementById('clientSecret')?.value || '',
+    oktaDomain:    val('oktaDomain'),
+    authServerId:  val('authServerId'),
+    clientId:      val('clientId'),
+    clientSecret:  document.getElementById('clientSecret')?.value  || '',
     adminApiToken: document.getElementById('adminApiToken')?.value || '',
-    authEnabled: document.getElementById('authEnabled').checked,
-    authClientId: val('authClientId'),
+    authEnabled:   document.getElementById('authEnabled').checked,
+    authClientId:  val('authClientId'),
     authScopes,
     redirectUri: val('redirectUri') || 'http://localhost:3001/auth/callback'
   };
 
-  // Save to localStorage
+  // Sync the two global fields to localStorage so other pages pick them up instantly
   const existing = JSON.parse(localStorage.getItem('oauthst-global') || '{}');
   localStorage.setItem('oauthst-global', JSON.stringify({
     ...existing,
-    oktaDomain: payload.oktaDomain,
-    authServerId: payload.authServerId,
-    clientId: payload.clientId
+    oktaDomain:    payload.oktaDomain,
+    adminApiToken: payload.adminApiToken   // ← was missing, caused admin/inspector pages to not auto-fill
   }));
 
-  // Save to server
+  // Save everything to server (config.json)
   try {
     const res = await fetch('/api/settings', {
       method: 'POST',
@@ -112,11 +111,11 @@ async function saveSettings() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
     renderSigningKey(data.signingKey);
-    toast('Settings saved — all tester pages will now use these values', 'success');
+    toast('Settings saved', 'success');
   } catch (e) {
     toast('Failed to save to server: ' + e.message, 'error');
   } finally {
-    setLoading(btn, false, '<i class="bi bi-floppy me-1"></i>Save Settings');
+    if (btn) setLoading(btn, false, '<i class="bi bi-floppy me-1"></i>Save Settings');
   }
 }
 
