@@ -1,6 +1,26 @@
 'use strict';
 // Shared utilities for all OAuth Super Tester pages
 
+// Every internal link must carry ?tenant=<id> — the app resolves tenant from
+// the query param first, cookie second, so a bare href would silently rely on
+// the cookie already being set (breaks on first login, shared/bookmarked
+// links, etc). This patches every same-origin <a> on the page once at load,
+// including any nav.js hasn't already rewritten (e.g. hand-authored tool
+// cards on home.html/index.html), rather than requiring every page to
+// remember to do it themselves.
+function tagInternalLinksWithTenant() {
+  const tenant = new URLSearchParams(window.location.search).get('tenant');
+  if (!tenant) return;
+  document.querySelectorAll('a[href^="/"]').forEach(a => {
+    const url = new URL(a.getAttribute('href'), window.location.origin);
+    if (!url.searchParams.has('tenant')) {
+      url.searchParams.set('tenant', tenant);
+      a.setAttribute('href', url.pathname + '?' + url.searchParams.toString());
+    }
+  });
+}
+document.addEventListener('DOMContentLoaded', tagInternalLinksWithTenant);
+
 function val(id) {
   return (document.getElementById(id)?.value || '').trim();
 }
@@ -173,39 +193,30 @@ function createScopeManager(containerId, inputId, initial = []) {
 // Everything else (authServerId, clientId, clientSecret, …) is saved independently per page.
 const GLOBAL_FIELDS = ['oktaDomain', 'adminApiToken'];
 
-// Config persistence per page prefix
+// Config persistence per page prefix — server-side, scoped to the current tenant
+// (see /api/tenant-settings/:page). localStorage is kept only as an instant-paint
+// cache so fields aren't blank while the server round-trip is in flight.
 function savePageConfig(prefix, fieldIds) {
   const cfg = {};
   fieldIds.forEach(id => { cfg[id] = document.getElementById(id)?.value || ''; });
   localStorage.setItem(`oauthst-${prefix}`, JSON.stringify(cfg));
 
-  // Sync shared fields to oauthst-global localStorage
-  const existing = JSON.parse(localStorage.getItem('oauthst-global') || '{}');
-  const update = {};
-  fieldIds.filter(id => GLOBAL_FIELDS.includes(id)).forEach(id => { if (cfg[id]) update[id] = cfg[id]; });
-  if (Object.keys(update).length) {
-    localStorage.setItem('oauthst-global', JSON.stringify({ ...existing, ...update }));
-    // Persist to server so settings survive restarts
-    fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(update) }).catch(() => {});
+  fetch(`/api/tenant-settings/${prefix}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) }).catch(() => {});
+
+  // Mirror shared fields into the tenant's "global" settings page so other pages pick them up.
+  if (prefix !== 'global') {
+    const update = {};
+    fieldIds.filter(id => GLOBAL_FIELDS.includes(id)).forEach(id => { if (cfg[id]) update[id] = cfg[id]; });
+    if (Object.keys(update).length) {
+      fetch('/api/tenant-settings/global', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(update) }).catch(() => {});
+    }
   }
 
   toast('Configuration saved', 'success');
 }
 
 function loadPageConfig(prefix, fieldIds) {
-  // 1. Global localStorage (immediate, no flash)
-  try {
-    const globalRaw = localStorage.getItem('oauthst-global');
-    if (globalRaw) {
-      const g = JSON.parse(globalRaw);
-      fieldIds.filter(id => GLOBAL_FIELDS.includes(id)).forEach(id => {
-        const el = document.getElementById(id);
-        if (el && g[id]) el.value = g[id];
-      });
-    }
-  } catch {}
-
-  // 2. Page-specific localStorage (overrides global)
+  // 1. Page-specific localStorage (immediate, no flash)
   try {
     const raw = localStorage.getItem(`oauthst-${prefix}`);
     if (raw) {
@@ -217,17 +228,22 @@ function loadPageConfig(prefix, fieldIds) {
     }
   } catch {}
 
-  // 3. Server config.json — only syncs the two truly global fields (oktaDomain, adminApiToken).
-  //    clientId, clientSecret, authServerId are now per-page only.
-  fetch('/api/settings').then(r => r.json()).then(s => {
-    const serverVals = { oktaDomain: s.oktaDomain, adminApiToken: s.adminApiToken };
+  // 2. Server — authoritative, scoped to the current tenant. Global fields load
+  //    first, then page-specific values (which win on conflict).
+  Promise.all([
+    prefix === 'global' ? Promise.resolve({}) : fetch('/api/tenant-settings/global').then(r => r.json()).catch(() => ({})),
+    fetch(`/api/tenant-settings/${prefix}`).then(r => r.json()).catch(() => ({}))
+  ]).then(([globalVals, pageVals]) => {
     let changed = false;
-    fieldIds.filter(id => GLOBAL_FIELDS.includes(id) && serverVals[id]).forEach(id => {
+    fieldIds.filter(id => GLOBAL_FIELDS.includes(id) && globalVals[id]).forEach(id => {
       const el = document.getElementById(id);
-      if (el && el.value !== serverVals[id]) { el.value = serverVals[id]; changed = true; }
+      if (el && el.value !== globalVals[id]) { el.value = globalVals[id]; changed = true; }
     });
-    const existing = JSON.parse(localStorage.getItem('oauthst-global') || '{}');
-    localStorage.setItem('oauthst-global', JSON.stringify({ ...existing, ...Object.fromEntries(GLOBAL_FIELDS.filter(id => serverVals[id]).map(id => [id, serverVals[id]])) }));
+    fieldIds.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && pageVals[id] !== undefined && pageVals[id] !== '' && el.value !== pageVals[id]) { el.value = pageVals[id]; changed = true; }
+    });
+    if (Object.keys(pageVals).length) localStorage.setItem(`oauthst-${prefix}`, JSON.stringify(pageVals));
     if (changed) document.getElementById('oktaDomain')?.dispatchEvent(new Event('input'));
   }).catch(() => {});
 }
@@ -236,6 +252,7 @@ function clearPageConfig(prefix, fieldIds) {
   if (!confirm('Clear all saved configuration for this page?')) return;
   localStorage.removeItem(`oauthst-${prefix}`);
   fieldIds.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  fetch(`/api/tenant-settings/${prefix}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(fieldIds.map(id => [id, '']))) }).catch(() => {});
   toast('Configuration cleared', 'info');
 }
 
@@ -244,13 +261,23 @@ async function initNavAuth() {
   const navArea = document.getElementById('navAuthArea');
   try {
     const r = await fetch('/api/auth/me');
-    if (r.status === 401) {
-      window.location.href = '/auth/login?returnTo=' + encodeURIComponent(window.location.pathname + window.location.search);
+    const data = await r.json();
+
+    if (r.status === 400) {
+      if (navArea) navArea.innerHTML = `<span style="font-size:0.75rem;color:var(--red)">No tenant — add <code>?tenant=&lt;id&gt;</code> to the URL</span>`;
       return;
     }
-    const data = await r.json();
+    if (r.status === 401) {
+      const tenant = data?.tenant?.id || new URLSearchParams(window.location.search).get('tenant') || '';
+      window.location.href = `/auth/login?tenant=${encodeURIComponent(tenant)}&returnTo=` + encodeURIComponent(window.location.pathname + window.location.search);
+      return;
+    }
     if (navArea && data.user) {
+      const tenantBadge = data.tenant
+        ? `<span style="font-size:0.7rem;background:var(--surface2);color:var(--blue);border:1px solid var(--border);border-radius:10px;padding:2px 9px;white-space:nowrap">${escHtml(data.tenant.title || data.tenant.id)}</span>`
+        : '';
       navArea.innerHTML = `<div class="d-flex align-items-center gap-2">
+        ${tenantBadge}
         <span style="font-size:0.78rem;color:var(--text-muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(data.user.name || data.user.email || data.user.sub)}</span>
         <a href="/auth/logout" class="btn btn-outline-secondary btn-sm" style="font-size:0.72rem;padding:2px 8px;white-space:nowrap">Logout</a>
       </div>`;

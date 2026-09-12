@@ -6,10 +6,11 @@ let exportedAppData = null;
 document.addEventListener('DOMContentLoaded', () => {
   window._pageSave = () => savePageConfig('admin', ['adminDomain','adminToken']);
   initNavAuth();
-  // Pre-fill from server settings
-  fetch('/api/settings').then(r => r.json()).then(s => {
-    if (s.oktaDomain)    document.getElementById('adminDomain').value = s.oktaDomain;
-    if (s.adminApiToken) document.getElementById('adminToken').value  = s.adminApiToken;
+  loadPageConfig('admin', ['adminDomain','adminToken']);
+  // Pre-fill Okta domain from the tenant's shared global settings too
+  fetch('/api/tenant-settings/global').then(r => r.json()).then(s => {
+    if (s.oktaDomain && !document.getElementById('adminDomain').value) document.getElementById('adminDomain').value = s.oktaDomain;
+    if (s.adminApiToken && !document.getElementById('adminToken').value) document.getElementById('adminToken').value = s.adminApiToken;
   }).catch(() => {});
 
   // Default "since" = 1 hour ago

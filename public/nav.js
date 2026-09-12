@@ -28,6 +28,15 @@
     return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
+  // Every internal link must carry ?tenant=<id> — the app resolves tenant from
+  // the query param first, cookie second, and a bare link would silently rely
+  // on the cookie already being set (breaks on first login, shared links, etc).
+  function withTenant(href) {
+    const tenant = new URLSearchParams(window.location.search).get('tenant');
+    if (!tenant) return href;
+    return `${href}?tenant=${encodeURIComponent(tenant)}`;
+  }
+
   function current() {
     const p = window.location.pathname;
     for (const [id, pg] of Object.entries(PAGES)) {
@@ -39,7 +48,7 @@
   function ddItem(id) {
     const pg = PAGES[id]; if (!pg) return '';
     const active = id === current();
-    return `<li><a href="${esc(pg.href)}" class="dropdown-item nav-item${active ? ' active' : ''}">
+    return `<li><a href="${esc(withTenant(pg.href))}" class="dropdown-item nav-item${active ? ' active' : ''}">
       <span class="nav-item-name">${esc(pg.label)}</span>
       <span class="nav-item-desc">${esc(pg.desc)}</span>
     </a></li>`;
@@ -60,7 +69,7 @@
   function buildNav() {
     const cur = current();
     return `<div class="nav-inner">
-      <a href="/home.html" class="nav-brand">
+      <a href="${esc(withTenant('/home.html'))}" class="nav-brand">
         <i class="bi bi-lightning-charge-fill" style="color:var(--blue,#58a6ff)"></i>
         <span>Okta OAuth Super Tester</span>
       </a>
@@ -68,14 +77,14 @@
       ${dropdown('grant', '🔑', 'Grant Flows',  ['auth-code','client-creds','saml','dpop','pkjwt','ciba','token-exchange','ropc'])}
       ${dropdown('tools', '🔍', 'Token Tools',  ['token-inspector','step-up'])}
       ${dropdown('admin', '🛡️', 'MFA & Admin', ['mfa','admin'])}
-      <a href="/workflow.html" class="nav-pill${cur === 'workflow' ? ' act' : ''}">
+      <a href="${esc(withTenant('/workflow.html'))}" class="nav-pill${cur === 'workflow' ? ' act' : ''}">
         <i class="bi bi-diagram-3"></i> Test Chain
       </a>
       <div class="nav-right">
         <button class="nav-save" id="navSaveBtn" title="Save current page settings (Ctrl+S)">
           <i class="bi bi-floppy me-1"></i>Save
         </button>
-        <a href="/settings.html" class="nav-pill nav-gear${cur === 'settings' ? ' act' : ''}" title="Settings">
+        <a href="${esc(withTenant('/settings.html'))}" class="nav-pill nav-gear${cur === 'settings' ? ' act' : ''}" title="Settings">
           <i class="bi bi-gear-fill"></i>
         </a>
         <div id="navAuthArea" style="display:flex;align-items:center"></div>

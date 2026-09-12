@@ -71,79 +71,46 @@
 
 <div class="container py-4" style="max-width:860px">
 
+  <!-- Current Tenant -->
+  <div class="card mb-4">
+    <div class="card-header"><div class="section-title"><i class="bi bi-building" style="color:var(--blue)"></i>Current Tenant</div></div>
+    <div class="card-body p-4">
+      <div class="help-box mb-0">
+        Login is always required and is driven by whichever tenant is active (<code>?tenant=&lt;id&gt;</code>), each
+        provisioned via the <code>/api/tenant</code> webhook with its own Okta/CIC IdP. There's nothing to configure here —
+        it's shown for reference.
+      </div>
+      <div class="row g-3 mt-1">
+        <div class="col-md-6">
+          <label class="form-label">Tenant ID</label>
+          <input type="text" id="tenantId" class="form-control" readonly>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Title</label>
+          <input type="text" id="tenantTitle" class="form-control" readonly>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Global Settings -->
   <div class="card mb-4">
     <div class="card-header"><div class="section-title"><i class="bi bi-sliders" style="color:var(--blue)"></i>Global Settings</div></div>
     <div class="card-body p-4">
       <div class="help-box mb-4">
-        <strong>Shared across all tester pages.</strong> Set these once — Okta Domain, Auth Server, and Client ID are
-        automatically pre-populated on the SAML, DPoP, and Private Key JWT pages.
+        <strong>Shared across all tester pages, scoped to the current tenant.</strong> Set these once — they're
+        automatically pre-populated on every other page for this tenant.
       </div>
       <div class="row g-3">
         <div class="col-md-7">
           <label class="form-label">Okta Domain *</label>
           <input type="text" id="oktaDomain" class="form-control" placeholder="yourorg.okta.com">
-          <div class="input-hint">Domain only, without https://</div>
+          <div class="input-hint">Domain only, without https:// — used by the OAuth-grant testing pages (independent of the tenant's own login IdP)</div>
         </div>
         <div class="col-md-5">
-          <label class="form-label">Authorization Server ID</label>
-          <input type="text" id="authServerId" class="form-control" placeholder="Leave empty for org-level server">
-          <div class="input-hint">Custom server ID (e.g. <code>aus...xxx</code>)</div>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Client ID (for testing flows)</label>
-          <input type="text" id="clientId" class="form-control" placeholder="0oa...">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Client Secret (for testing flows)</label>
-          <input type="password" id="clientSecret" class="form-control" placeholder="Used by SAML and DPoP token exchange">
-        </div>
-        <div class="col-12">
-          <label class="form-label">Admin API Token (SSWS) <span style="color:var(--text-muted)">— Token Inspector lifetime &amp; Admin API</span></label>
+          <label class="form-label">Admin API Token (SSWS)</label>
           <input type="password" id="adminApiToken" class="form-control" placeholder="00YXSE_... (Admin Console → Security → API → Tokens)">
-          <div class="input-hint">Used for Okta Management API: app lifecycle, MFA management, audit log, token policies. Stored server-side only.</div>
-        </div>
-      </div>
-      <div class="mt-3 p-3" style="background:var(--surface2);border-radius:8px;font-size:0.8rem;">
-        <span style="color:var(--text-muted)">Token endpoint: </span>
-        <span id="endpointPreview" style="color:var(--orange);font-family:monospace;font-size:0.75rem;">—</span>
-      </div>
-    </div>
-  </div>
-
-  <!-- App Authentication -->
-  <div class="card mb-4">
-    <div class="card-header"><div class="section-title"><i class="bi bi-shield-lock-fill" style="color:var(--blue)"></i>App Authentication</div></div>
-    <div class="card-body p-4">
-      <div class="help-box mb-4">
-        <strong>Protect this app using Okta.</strong> When enabled, all pages redirect to Okta for login.
-        Authentication uses <strong>Authorization Code + PKCE + Private Key JWT</strong>
-        — the app signs a client assertion with its own RS256 key instead of using a client secret.
-        <br><br>
-        The app signing key (below) must be registered as a public key in your Okta app before enabling auth.
-      </div>
-
-      <div class="row g-3">
-        <div class="col-12">
-          <div class="form-check form-switch d-flex align-items-center gap-3">
-            <input class="form-check-input" type="checkbox" id="authEnabled" role="switch" style="width:2.5em;height:1.3em">
-            <label class="form-check-label" for="authEnabled" style="font-weight:600;font-size:0.875rem">Enable authentication for this app</label>
-          </div>
-          <div class="input-hint mt-1">Once enabled, all pages require an active Okta session</div>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Auth Client ID</label>
-          <input type="text" id="authClientId" class="form-control" placeholder="Leave empty to use Global Client ID">
-          <div class="input-hint">Defaults to Global Client ID above</div>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Redirect URI</label>
-          <input type="text" id="redirectUri" class="form-control" value="http://localhost:3001/auth/callback">
-        </div>
-        <div class="col-12">
-          <label class="form-label">Scopes</label>
-          <input type="text" id="authScopes" class="form-control" placeholder="openid profile email">
-          <div class="input-hint">Space-separated. Must include <code>openid</code>.</div>
+          <div class="input-hint">Used for Okta Management API: app lifecycle, MFA, audit log, token policies.</div>
         </div>
       </div>
     </div>
@@ -176,7 +143,7 @@
         <span style="color:var(--text-muted)">kid:</span>
         <code id="keyKid" style="color:var(--orange);font-size:0.75rem;word-break:break-all"></code>
         <span class="key-badge" id="keyAlg">RS256</span>
-        <span class="ms-auto" style="font-size:0.72rem;color:var(--text-muted)">Persisted in <code>keys/signing-key.json</code></span>
+        <span class="ms-auto" style="font-size:0.72rem;color:var(--text-muted)">Persisted server-side (KV store)</span>
       </div>
       <div id="noKey" class="key-info-row mb-3">
         <span class="key-badge missing">No key generated yet</span>

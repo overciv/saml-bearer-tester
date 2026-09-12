@@ -1,68 +1,27 @@
 'use strict';
-const fs = require('fs');
-const path = require('path');
+// App-wide (non-tenant) state: just the RS256 signing key used by the
+// private_key_jwt testing pages (pkjwt.js, dpop.js, etc.) and by the app's
+// own JWKS endpoint. Stored in the shared KV store so it survives across
+// serverless invocations instead of local disk.
+
 const { generateKeyPair, exportJWK } = require('jose');
 const { v4: uuidv4 } = require('uuid');
+const store = require('./store');
 
-const ROOT = path.join(__dirname, '..');
-const CONFIG_FILE = path.join(ROOT, 'config.json');
-const KEYS_DIR = path.join(ROOT, 'keys');
-const SIGNING_KEY_FILE = path.join(KEYS_DIR, 'signing-key.json');
+const SIGNING_KEY_KEY = 'signingkey';
 
-const DEFAULTS = {
-  oktaDomain: '',
-  authServerId: '',
-  clientId: '',
-  clientSecret: '',
-  adminApiToken: '',
-  authEnabled: false,
-  authClientId: '',
-  authScopes: ['openid', 'profile', 'email'],
-  redirectUri: 'http://localhost:3001/auth/callback',
-  sessionSecret: uuidv4()
-};
-
-let _config = null;
 let _signingKey = null;
-
-function getConfig() {
-  if (_config) return _config;
-  try {
-    _config = { ...DEFAULTS, ...JSON.parse(fs.readFileSync(CONFIG_FILE, 'utf8')) };
-  } catch {
-    _config = { ...DEFAULTS };
-    _saveConfigToDisk(_config);
-  }
-  return _config;
-}
-
-function _saveConfigToDisk(cfg) {
-  try {
-    fs.writeFileSync(CONFIG_FILE, JSON.stringify(cfg, null, 2));
-  } catch (e) {
-    console.error('Failed to write config.json:', e.message);
-  }
-}
-
-function saveConfig(data) {
-  getConfig();
-  // Never overwrite the session secret from a client call
-  const { sessionSecret: _ignored, ...safe } = data;
-  _config = { ..._config, ...safe };
-  _saveConfigToDisk(_config);
-  return _config;
-}
 
 async function getSigningKey() {
   if (_signingKey) return _signingKey;
-  try {
-    _signingKey = JSON.parse(fs.readFileSync(SIGNING_KEY_FILE, 'utf8'));
+  const stored = await store.get(SIGNING_KEY_KEY);
+  if (stored) {
+    _signingKey = stored;
     console.log(`  Signing key loaded  kid=${_signingKey.kid}`);
     return _signingKey;
-  } catch {
-    console.log('  No signing key — generating RS256 key pair...');
-    return generateSigningKey();
   }
+  console.log('  No signing key — generating RS256 key pair...');
+  return generateSigningKey();
 }
 
 async function generateSigningKey() {
@@ -73,8 +32,7 @@ async function generateSigningKey() {
   Object.assign(privateJwk, { alg, use: 'sig', kid });
   Object.assign(publicJwk, { alg, use: 'sig', kid });
   _signingKey = { alg, kid, privateJwk, publicJwk, jwks: { keys: [publicJwk] } };
-  fs.mkdirSync(KEYS_DIR, { recursive: true });
-  fs.writeFileSync(SIGNING_KEY_FILE, JSON.stringify(_signingKey, null, 2));
+  await store.set(SIGNING_KEY_KEY, _signingKey);
   console.log(`  Signing key generated  kid=${kid}`);
   return _signingKey;
 }
@@ -84,20 +42,4 @@ function getPublicJwks() {
   return { keys: [_signingKey.publicJwk] };
 }
 
-// Public view of config (no private fields)
-function getPublicConfig() {
-  const cfg = getConfig();
-  return {
-    oktaDomain: cfg.oktaDomain,
-    authServerId: cfg.authServerId,
-    clientId: cfg.clientId,
-    clientSecret: cfg.clientSecret,
-    adminApiToken: cfg.adminApiToken,
-    authEnabled: cfg.authEnabled,
-    authClientId: cfg.authClientId,
-    authScopes: cfg.authScopes,
-    redirectUri: cfg.redirectUri
-  };
-}
-
-module.exports = { getConfig, saveConfig, getSigningKey, generateSigningKey, getPublicJwks, getPublicConfig };
+module.exports = { getSigningKey, generateSigningKey, getPublicJwks };

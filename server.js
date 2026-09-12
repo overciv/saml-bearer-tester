@@ -1,6 +1,7 @@
 'use strict';
 const express = require('express');
 const session = require('express-session');
+const cookieParser = require('cookie-parser');
 const axios = require('axios');
 const path = require('path');
 
@@ -12,45 +13,51 @@ const { exchange: tokenExchange } = require('./src/token-exchange');
 const { revokeAndVerify, getTokenLifetime } = require('./src/token-inspector');
 const { startFlow, handleCallback, getFlowStatus, clientCredentials, resourceOwnerPassword } = require('./src/auth-code');
 const { createApp, getApp, cloneApp, findUser, listFactors, resetFactor, getSystemLog, assignAppOwner, deleteApp, factorChallenge, factorPoll, enrollFactor, activateFactor, pollFactorActivation } = require('./src/admin-api');
-const { getConfig, saveConfig, getSigningKey, generateSigningKey, getPublicJwks, getPublicConfig } = require('./src/config');
+const { getSigningKey, generateSigningKey, getPublicJwks } = require('./src/config');
 const { requireAuth, loginHandler, callbackHandler, logoutHandler, meHandler } = require('./src/auth');
+const { resolveTenant } = require('./src/tenant');
+const { handleTenantWebhook } = require('./src/tenant-webhook');
+const { getPageSettings, savePageSettings } = require('./src/tenant-settings');
+const { KvSessionStore } = require('./src/session-store');
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
 
-const cfg = getConfig();  // ensure config.json created + session secret available
+if (!process.env.SESSION_SECRET) {
+  console.warn('  ⚠️  SESSION_SECRET not set — using an insecure dev-only default. Set it in production.');
+}
 
 const app = express();
+app.set('trust proxy', 1); // correct req.protocol/host behind Vercel's proxy
 app.use(express.json({ limit: '2mb' }));
+app.use(cookieParser());
 
 app.use(session({
-  secret: cfg.sessionSecret,
+  store: new KvSessionStore(),
+  secret: process.env.SESSION_SECRET || 'dev-only-insecure-session-secret',
   resave: false,
   saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: 'lax', maxAge: 8 * 60 * 60 * 1000 }
+  cookie: { httpOnly: true, sameSite: 'lax', secure: !!process.env.VERCEL, maxAge: 8 * 60 * 60 * 1000 }
 }));
 
-// ─── Auth routes (always accessible) ─────────────────────────────────────────
+// ─── Tenant webhook (public — guarded by its own shared secret) ──────────────
+
+app.post('/api/tenant', handleTenantWebhook);
+
+// ─── Tenant resolution (attaches req.tenant for everything below) ────────────
+
+app.use(resolveTenant);
+
+// ─── Auth routes (bypass requireAuth — see FREE_PATHS/FREE_PREFIXES) ─────────
 
 app.get('/auth/login', loginHandler);
 app.get('/auth/callback', callbackHandler);
 app.get('/auth/logout', logoutHandler);
-app.get('/auth/jwks', (req, res) => res.json(getPublicJwks()));
+app.get('/auth/jwks', async (req, res) => { await getSigningKey(); res.json(getPublicJwks()); });
 app.get('/api/auth/me', meHandler);
 
-// ─── Settings API (mostly open — see requireAuth for POST restriction) ────────
+// ─── Auth guard (protects static files + API routes below) ───────────────────
 
-app.get('/api/settings', (req, res) => {
-  const jwks = getPublicJwks();
-  res.json({ ...getPublicConfig(), signingKey: { jwks, hasKey: jwks.keys.length > 0 } });
-});
-
-app.post('/api/settings', (req, res) => {
-  try {
-    const saved = saveConfig(req.body);
-    const signingKey = getPublicJwks();
-    res.json({ ...getPublicConfig(), signingKey: { jwks: signingKey, hasKey: signingKey.keys.length > 0 } });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+app.use(requireAuth);
 
 app.post('/api/auth/generate-signing-key', async (req, res) => {
   try {
@@ -59,12 +66,20 @@ app.post('/api/auth/generate-signing-key', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ─── Auth guard (protects static files + API routes below) ───────────────────
+// ─── Tenant-scoped per-page settings (replaces browser localStorage as source of truth) ──
 
-app.use(requireAuth);
+app.get('/api/tenant-settings/:page', async (req, res) => {
+  try { res.json(await getPageSettings(req.tenant.id, req.params.page)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/tenant-settings/:page', async (req, res) => {
+  try { res.json(await savePageSettings(req.tenant.id, req.params.page, req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 // Root redirect: / → /home.html  (SAML page lives at /index.html)
-app.get('/', (req, res) => res.redirect('/home.html'));
+app.get('/', (req, res) => res.redirect(`/home.html?tenant=${encodeURIComponent(req.tenant.id)}`));
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -368,19 +383,25 @@ app.post('/api/introspect', async (req, res) => {
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
+// Only listen when run directly (`node server.js` / `npm start`). On Vercel this
+// module is required by api/index.js instead — the platform handles the listener.
 
-(async () => {
-  await getSigningKey();  // generate on first run
-  const PORT = process.env.PORT || 3001;
-  app.listen(PORT, () => {
-    console.log(`\n⚡ Okta OAuth Super Tester  →  http://localhost:${PORT}`);
-    console.log(`   SAML        →  http://localhost:${PORT}/`);
-    console.log(`   DPoP        →  http://localhost:${PORT}/dpop.html`);
-    console.log(`   Priv Key JWT → http://localhost:${PORT}/pkjwt.html`);
-  console.log(`   CIBA         → http://localhost:${PORT}/ciba.html`);
-  console.log(`   Token Exch   → http://localhost:${PORT}/token-exchange.html`);
-  console.log(`   Token Insp   → http://localhost:${PORT}/token-inspector.html`);
-  console.log(`   Admin API    → http://localhost:${PORT}/admin.html`);
-    console.log(`   Settings    →  http://localhost:${PORT}/settings.html\n`);
-  });
-})();
+if (require.main === module) {
+  (async () => {
+    await getSigningKey();  // generate on first run
+    const PORT = process.env.PORT || 3001;
+    app.listen(PORT, () => {
+      console.log(`\n⚡ Okta OAuth Super Tester  →  http://localhost:${PORT}`);
+      console.log(`   SAML        →  http://localhost:${PORT}/`);
+      console.log(`   DPoP        →  http://localhost:${PORT}/dpop.html`);
+      console.log(`   Priv Key JWT → http://localhost:${PORT}/pkjwt.html`);
+      console.log(`   CIBA         → http://localhost:${PORT}/ciba.html`);
+      console.log(`   Token Exch   → http://localhost:${PORT}/token-exchange.html`);
+      console.log(`   Token Insp   → http://localhost:${PORT}/token-inspector.html`);
+      console.log(`   Admin API    → http://localhost:${PORT}/admin.html`);
+      console.log(`   Settings    →  http://localhost:${PORT}/settings.html\n`);
+    });
+  })();
+}
+
+module.exports = app;

@@ -6,7 +6,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   window._pageSave = () => savePageConfig('token-inspector', ['oktaDomain','authServerId','clientId','clientSecret','adminApiToken']);
   initNavAuth();
-  fetch('/api/settings').then(r => r.json()).then(s => {
+  fetch('/api/tenant-settings/global').then(r => r.json()).then(s => {
     if (s.oktaDomain)    { document.getElementById('revOktaDomain').value = s.oktaDomain; document.getElementById('ltOktaDomain').value = s.oktaDomain; }
     if (s.authServerId)  { document.getElementById('revAuthServerId').value = s.authServerId; document.getElementById('ltAuthServerId').value = s.authServerId; }
     if (s.clientId)      document.getElementById('revClientId').value = s.clientId;

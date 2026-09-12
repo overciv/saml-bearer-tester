@@ -352,33 +352,18 @@ function saveConfig() {
   cfg.attributes = collectAttributes();
   localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
 
+  fetch('/api/tenant-settings/saml', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cfg) }).catch(() => {});
+
   // Only oktaDomain is synced globally — clientId/secret/authServerId are per-page
-  const GLOBAL = ['oktaDomain'];
-  const existing = JSON.parse(localStorage.getItem('oauthst-global') || '{}');
-  const update = {};
-  GLOBAL.forEach(id => { if (cfg[id]) update[id] = cfg[id]; });
-  localStorage.setItem('oauthst-global', JSON.stringify({ ...existing, ...update }));
-  if (Object.keys(update).length)
-    fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(update) }).catch(() => {});
+  if (cfg.oktaDomain) {
+    fetch('/api/tenant-settings/global', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ oktaDomain: cfg.oktaDomain }) }).catch(() => {});
+  }
 
   toast('Configuration saved', 'success');
 }
 
 function loadConfig() {
-  // 1. Global localStorage (immediate)
-  try {
-    const globalRaw = localStorage.getItem('oauthst-global');
-    if (globalRaw) {
-      const g = JSON.parse(globalRaw);
-      // Only oktaDomain from global; everything else is per-page
-      ['oktaDomain'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el && g[id]) el.value = g[id];
-      });
-    }
-  } catch {}
-
-  // 2. Page-specific localStorage (overrides global)
+  // 1. Page-specific localStorage (immediate)
   const raw = localStorage.getItem(CONFIG_KEY);
   if (raw) {
     try {
@@ -392,15 +377,23 @@ function loadConfig() {
     } catch {}
   }
 
-  // 3. Server config.json — only oktaDomain is global; rest is per-page
-  fetch('/api/settings').then(r => r.json()).then(s => {
-    if (s.oktaDomain) {
+  // 2. Server — authoritative, scoped to the current tenant
+  Promise.all([
+    fetch('/api/tenant-settings/global').then(r => r.json()).catch(() => ({})),
+    fetch('/api/tenant-settings/saml').then(r => r.json()).catch(() => ({}))
+  ]).then(([g, cfg]) => {
+    if (g.oktaDomain) {
       const el = document.getElementById('oktaDomain');
-      if (el && el.value !== s.oktaDomain) el.value = s.oktaDomain;
+      if (el && el.value !== g.oktaDomain) el.value = g.oktaDomain;
     }
+    CONFIG_FIELDS.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && cfg[id] !== undefined && cfg[id] !== '') el.value = cfg[id];
+    });
+    if (cfg.scopes?.length) { scopeList = cfg.scopes; renderScopes(); }
+    if (cfg.attributes) Object.entries(cfg.attributes).forEach(([k, v]) => addAttrRow(k, v));
+    localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
     updateTokenEndpointPreview();
-    const existing = JSON.parse(localStorage.getItem('oauthst-global') || '{}');
-    if (s.oktaDomain) localStorage.setItem('oauthst-global', JSON.stringify({ ...existing, oktaDomain: s.oktaDomain }));
   }).catch(() => { updateTokenEndpointPreview(); });
 }
 
@@ -414,6 +407,9 @@ function clearConfig() {
   scopeList = ['openid'];
   renderScopes();
   document.getElementById('attrRows').innerHTML = '';
+  const cleared = Object.fromEntries(CONFIG_FIELDS.map(id => [id, '']));
+  cleared.scopes = []; cleared.attributes = {};
+  fetch('/api/tenant-settings/saml', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cleared) }).catch(() => {});
   toast('Configuration cleared', 'info');
 }
 
