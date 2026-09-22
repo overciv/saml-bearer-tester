@@ -214,6 +214,8 @@ const STEP_DEFS = {
 let chain = [];  // array of step objects
 let outputStore = {};  // { 'stepId.outputName': value }
 let dragType = null;
+let chainId = null;    // stable id for this workspace's auto-provisioned Okta app
+let chainApp = null;   // { exists, appId, clientId, clientSecret, redirectUri } | { exists:false }
 
 const G = () => JSON.parse(localStorage.getItem('oauthst-global') || '{}');
 
@@ -395,6 +397,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   renderPipeline();
+  refreshChainApp();
 });
 
 // ─── Chain persistence ────────────────────────────────────────────────────────
@@ -406,10 +409,61 @@ function saveChain() {
 }
 
 function loadChain() {
+  chainId = localStorage.getItem('workflow-chain-id');
+  if (!chainId) {
+    chainId = 'chain_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+    localStorage.setItem('workflow-chain-id', chainId);
+  }
   try {
     const saved = JSON.parse(localStorage.getItem('workflow-chain') || '[]');
     chain = saved.map(s => ({ ...makeStep(s.type, s.id), config: s.config || {}, bindings: s.bindings || {} }));
   } catch { chain = []; }
+}
+
+// ─── Chain-test Okta app (auto-created on first Run, one per workspace) ──────
+
+async function refreshChainApp() {
+  try {
+    const r = await fetch(`/api/chain-app/${encodeURIComponent(chainId)}`);
+    chainApp = await r.json();
+  } catch { chainApp = { exists: false }; }
+  renderChainAppBadge();
+}
+
+function renderChainAppBadge() {
+  const badge = document.getElementById('chainAppBadge');
+  const btn = document.getElementById('deleteChainAppBtn');
+  if (!badge || !btn) return;
+  if (chainApp?.exists) {
+    badge.style.display = '';
+    badge.innerHTML = `<i class="bi bi-shield-check me-1"></i>App: ${escHtml(chainApp.clientId || '')}`;
+    btn.style.display = '';
+  } else {
+    badge.style.display = 'none';
+    btn.style.display = 'none';
+  }
+}
+
+async function deleteChainApp() {
+  if (!chainApp?.exists) return;
+  if (!confirm(`Delete the Okta app "${chainApp.clientId}" created for this Test Chain workspace?\nThis removes it from Okta permanently.`)) return;
+  try {
+    const r = await fetch(`/api/chain-app/${encodeURIComponent(chainId)}`, { method: 'DELETE' });
+    const result = await r.json();
+    if (!r.ok) throw new Error(result.error || `HTTP ${r.status}`);
+
+    const deletedClientId = chainApp.clientId;
+    chain.forEach(s => {
+      if (s.config.clientId === deletedClientId) { s.config.clientId = ''; s.config.clientSecret = ''; }
+    });
+    chainApp = { exists: false };
+    saveChain();
+    renderPipeline();
+    renderChainAppBadge();
+    toast('Okta app deleted', 'info');
+  } catch (e) {
+    toast(`Could not delete Okta app: ${e.message}`, 'error');
+  }
 }
 
 function clearChain() {
@@ -744,6 +798,38 @@ async function runChain(fromIdx = 0) {
   const stopBtn = document.getElementById('stopBtn');
   setLoading(runBtn, true, '<i class="bi bi-play-fill me-1"></i>Running…');
   if (stopBtn) stopBtn.style.display = '';
+
+  if (!chainApp?.exists) {
+    const label = chain.map(s => STEP_DEFS[s.type]?.label || s.type).join(' → ').slice(0, 60);
+    setLoading(runBtn, true, '<i class="bi bi-shield-plus me-1"></i>Creating app…');
+    try {
+      const r = await fetch('/api/chain-app', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chainId, chainLabel: `Test Chain: ${label}` })
+      });
+      chainApp = await r.json();
+      if (!r.ok) throw new Error(chainApp.error || `HTTP ${r.status}`);
+
+      // Only fill fields the user left empty — don't clobber deliberate overrides.
+      chain.forEach(s => {
+        const fields = STEP_DEFS[s.type]?.configFields || [];
+        if (fields.some(f => f.k === 'clientId') && !s.config.clientId) s.config.clientId = chainApp.clientId;
+        if (fields.some(f => f.k === 'clientSecret') && !s.config.clientSecret) s.config.clientSecret = chainApp.clientSecret;
+        if (fields.some(f => f.k === 'redirectUri') && !s.config.redirectUri) s.config.redirectUri = chainApp.redirectUri;
+      });
+      saveChain();
+      renderChainAppBadge();
+      toast('Okta test app ready', 'success');
+    } catch (e) {
+      toast(`Could not auto-create Okta app: ${e.message}`, 'error');
+      _chainRunning = false;
+      setLoading(runBtn, false, '<i class="bi bi-play-fill me-1"></i>Run Chain');
+      if (stopBtn) stopBtn.style.display = 'none';
+      return;
+    }
+  }
+
+  setLoading(runBtn, true, '<i class="bi bi-play-fill me-1"></i>Running…');
   openNetworkPanel();
 
   document.getElementById('runLog').style.display = '';

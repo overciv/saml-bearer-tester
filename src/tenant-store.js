@@ -26,6 +26,11 @@ function encryptForStorage(tenant) {
   if (t.managementCredentials?.clientJWKS) {
     t.managementCredentials.clientJWKS = encrypt(t.managementCredentials.clientJWKS);
   }
+  if (t.chainApps) {
+    for (const cid of Object.keys(t.chainApps)) {
+      if (t.chainApps[cid]?.clientSecret) t.chainApps[cid].clientSecret = encrypt(t.chainApps[cid].clientSecret);
+    }
+  }
   return t;
 }
 
@@ -40,6 +45,11 @@ function decryptFromStorage(t) {
   }
   if (out.managementCredentials?.clientJWKS) {
     out.managementCredentials.clientJWKS = decryptJson(out.managementCredentials.clientJWKS);
+  }
+  if (out.chainApps) {
+    for (const cid of Object.keys(out.chainApps)) {
+      if (out.chainApps[cid]?.clientSecret) out.chainApps[cid].clientSecret = decrypt(out.chainApps[cid].clientSecret);
+    }
   }
   return out;
 }

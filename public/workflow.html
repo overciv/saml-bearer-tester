@@ -133,6 +133,10 @@
   <div class="topbar-title"><i class="bi bi-diagram-3" style="color:var(--blue)"></i>Test Chain Builder</div>
   <div class="ms-auto d-flex gap-2 align-items-center">
     <span id="chainStatus" style="font-size:0.75rem;color:var(--text-muted)"></span>
+    <span id="chainAppBadge" style="display:none;font-size:0.72rem;color:var(--text-muted)" title="Okta app auto-created for this Test Chain workspace"></span>
+    <button class="btn btn-sm" id="deleteChainAppBtn" style="display:none;color:var(--red);border:1px solid rgba(248,81,73,0.4);background:rgba(248,81,73,0.06)" onclick="deleteChainApp()" title="Delete the Okta app auto-created for this workspace">
+      <i class="bi bi-trash me-1"></i>Delete App
+    </button>
     <button class="btn btn-sm btn-outline-secondary" id="saveChainsBtn" onclick="openSaveDialog()" title="Save chain with a name"><i class="bi bi-floppy me-1"></i>Save</button>
     <button class="btn btn-sm btn-outline-secondary" id="loadChainsBtn" onclick="toggleSavedPanel()" title="Load a saved chain"><i class="bi bi-bookmark-star me-1"></i>Saved</button>
     <button class="btn btn-sm btn-outline-secondary" onclick="clearChain()"><i class="bi bi-trash me-1"></i>Clear</button>

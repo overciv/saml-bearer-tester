@@ -18,6 +18,7 @@ const { requireAuth, loginHandler, callbackHandler, logoutHandler, meHandler } =
 const { resolveTenant } = require('./src/tenant');
 const { handleTenantWebhook } = require('./src/tenant-webhook');
 const { getPageSettings, savePageSettings } = require('./src/tenant-settings');
+const { getChainApp, createChainApp, deleteChainApp } = require('./src/chain-app');
 const { KvSessionStore } = require('./src/session-store');
 
 // ─── Bootstrap ────────────────────────────────────────────────────────────────
@@ -75,6 +76,30 @@ app.get('/api/tenant-settings/:page', async (req, res) => {
 
 app.post('/api/tenant-settings/:page', async (req, res) => {
   try { res.json(await savePageSettings(req.tenant.id, req.params.page, req.body)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── Test Chain auto-provisioned Okta app (one per workspace/chainId) ───────
+// NOTE: deliberately NOT under /api/tenant/* — src/auth.js's FREE_PREFIXES
+// bypasses requireAuth for any path starting with '/api/tenant' (the public
+// webhook), so these must live at a distinct, still-authenticated path.
+
+app.get('/api/chain-app/:chainId', async (req, res) => {
+  try { res.json(getChainApp(req.tenant, req.params.chainId)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/chain-app', async (req, res) => {
+  try {
+    res.json(await createChainApp({
+      tenant: req.tenant, chainId: req.body.chainId, chainLabel: req.body.chainLabel,
+      user: req.session.user
+    }));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.delete('/api/chain-app/:chainId', async (req, res) => {
+  try { res.json(await deleteChainApp({ tenant: req.tenant, chainId: req.params.chainId })); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
