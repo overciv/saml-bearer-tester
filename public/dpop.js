@@ -124,61 +124,17 @@ async function acquireToken() {
   }
 }
 
+// Thin wrapper — the per-item rendering itself lives in common.js's
+// renderNetworkEntry() so the same timeline UI is shared with the Test Chain's
+// live network panel (public/workflow.js).
 function renderFlowTimeline(steps) {
   const container = document.getElementById('flowItems');
-  container.innerHTML = '';
-  steps.forEach((step, i) => {
-    const item = document.createElement('div');
-    item.className = 'flow-item';
-
-    let iconClass, icon, bodyHtml;
-
-    if (step.type === 'proof') {
-      iconClass = 'proof';
-      icon = 'bi-fingerprint';
-      bodyHtml = `
-        <div class="row g-3">
-          <div class="col-md-5">
-            <div style="font-size:0.72rem;color:var(--text-muted);mb-1">Header</div>
-            <div class="code-block json" style="max-height:160px">${escHtml(JSON.stringify(step.decodedHeader, null, 2))}</div>
-          </div>
-          <div class="col-md-7">
-            <div style="font-size:0.72rem;color:var(--text-muted);mb-1">Payload</div>
-            <div class="code-block json" style="max-height:160px">${escHtml(JSON.stringify(step.decodedPayload, null, 2))}</div>
-          </div>
-          <div class="col-12">
-            <div style="font-size:0.72rem;color:var(--text-muted);mb-1">Raw JWT</div>
-            <div class="code-block base64" style="max-height:60px">${escHtml(step.proof)}</div>
-          </div>
-        </div>`;
-    } else if (step.type === 'request') {
-      iconClass = 'request';
-      icon = 'bi-arrow-up-circle';
-      bodyHtml = `<div class="code-block json" style="max-height:200px">${escHtml(JSON.stringify({method: step.method, url: step.url, headers: step.headers, body: step.body}, null, 2))}</div>
-        <div class="mt-2" style="font-size:0.72rem;color:var(--text-muted)">${step.durationMs}ms</div>`;
-    } else if (step.type === 'response') {
-      iconClass = step.statusCode >= 200 && step.statusCode < 300 ? 'response-ok' : 'response-err';
-      icon = step.statusCode >= 200 && step.statusCode < 300 ? 'bi-check-circle' : 'bi-x-circle';
-      bodyHtml = `<div class="mb-2">${statusBadge(step.statusCode)}</div>
-        <div class="code-block json" style="max-height:200px">${escHtml(JSON.stringify(step.data, null, 2))}</div>`;
-      if (step.responseHeaders?.['dpop-nonce']) {
-        bodyHtml += `<div class="mt-2 p-2" style="background:rgba(210,153,34,0.1);border-radius:6px;font-size:0.78rem;"><i class="bi bi-key me-1" style="color:var(--yellow)"></i><strong>dpop-nonce:</strong> <code>${escHtml(step.responseHeaders['dpop-nonce'])}</code></div>`;
-      }
-    } else if (step.type === 'nonce') {
-      iconClass = 'nonce';
-      icon = 'bi-arrow-repeat';
-      bodyHtml = `<div style="font-size:0.82rem">${escHtml(step.detail)}</div>
-        <div class="mt-2 p-2" style="background:rgba(210,153,34,0.08);border-radius:6px;font-size:0.78rem;">nonce: <code>${escHtml(step.nonce)}</code></div>`;
-    }
-
-    item.innerHTML = `
-      <div class="flow-item-header" onclick="this.nextElementSibling.classList.toggle('open')">
-        <div class="flow-icon ${iconClass}"><i class="bi ${icon}"></i></div>
-        <span class="flow-item-title">${escHtml(step.label)}</span>
-        <span class="flow-item-meta"><i class="bi bi-chevron-down"></i></span>
-      </div>
-      <div class="flow-item-body${i === steps.length - 1 ? ' open' : ''}">${bodyHtml}</div>`;
-    container.appendChild(item);
+  container.innerHTML = steps.map(renderNetworkEntry).join('');
+  // Standalone page behavior: last item starts expanded.
+  const bodies = container.querySelectorAll('.flow-item-body');
+  if (bodies.length) bodies[bodies.length - 1].classList.add('open');
+  container.querySelectorAll('[data-bs-toggle="popover"]').forEach(el => {
+    if (!el._popoverInited && window.bootstrap?.Popover) { new bootstrap.Popover(el, { container: 'body' }); el._popoverInited = true; }
   });
 }
 

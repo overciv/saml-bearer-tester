@@ -86,13 +86,19 @@ async function pollToken({
     headers['Authorization'] = `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64')}`;
   }
 
+  const requestDetails = {
+    method: 'POST', url: ep,
+    headers: { ...headers, Authorization: headers.Authorization ? `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString('base64').substring(0, 8)}...` : '(via client_assertion)' },
+    body: { grant_type: 'urn:openid:params:grant-type:ciba', auth_req_id: authReqId.substring(0, 12) + '...', scope: scopes }
+  };
+
   const t0 = Date.now();
   try {
     const r = await axios.post(ep, params.toString(), { headers, validateStatus: () => true });
     const err = r.data?.error;
     return {
       statusCode: r.status, durationMs: Date.now() - t0,
-      endpoint: ep, response: r.data,
+      endpoint: ep, requestDetails, response: r.data,
       pending:   err === 'authorization_pending',
       slowDown:  err === 'slow_down',
       expired:   err === 'expired_token',
@@ -100,7 +106,7 @@ async function pollToken({
       success:   r.status >= 200 && r.status < 300 && !err
     };
   } catch (e) {
-    return { statusCode: 0, durationMs: Date.now() - t0, endpoint: ep, error: e.message, pending: false, success: false };
+    return { statusCode: 0, durationMs: Date.now() - t0, endpoint: ep, requestDetails, error: e.message, pending: false, success: false };
   }
 }
 

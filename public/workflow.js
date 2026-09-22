@@ -11,6 +11,7 @@ const STEP_DEFS = {
       {k:'clientId',        label:'Client ID',         type:'text',     ph:'0oa...'},
       {k:'scope',           label:'Scope',             type:'text',     ph:'openid profile email'},
       {k:'redirectUri',     label:'Redirect URI',      type:'text',     def:'http://localhost:3001/oauth/callback'},
+      {k:'maxAge',          label:'Max Age (seconds, optional)', type:'text', ph:'0 = force re-auth'},
       {k:'clientAuthMethod',label:'Client Auth',       type:'select',   options:[
         {value:'none',  label:'None (public client)'},
         {value:'basic', label:'Client Secret (Basic)'},
@@ -25,9 +26,14 @@ const STEP_DEFS = {
     bg:'rgba(61,203,122,0.1)',
     inputs:[], outputs:['access_token'],
     configFields:[
-      {k:'clientId',    label:'Client ID',     type:'text',     ph:'0oa...'},
-      {k:'clientSecret',label:'Client Secret', type:'password', ph:''},
-      {k:'scope',       label:'Scope',         type:'text',     ph:'openid'},
+      {k:'clientId',        label:'Client ID',          type:'text',     ph:'0oa...'},
+      {k:'clientAuthMethod',label:'Client Auth',        type:'select',   options:[
+        {value:'basic', label:'Client Secret (Basic)'},
+        {value:'pkjwt', label:'Private Key JWT'},
+      ]},
+      {k:'clientSecret',    label:'Client Secret',      type:'password', ph:'(if Basic auth)'},
+      {k:'privateJwk',      label:'Private JWK (JSON)', type:'textarea', ph:'{"kty":"RSA",...} (if PKJWT)'},
+      {k:'scope',           label:'Scope',              type:'text',     ph:'openid'},
     ]
   },
   'saml-bearer': {
@@ -35,9 +41,14 @@ const STEP_DEFS = {
     bg:'rgba(88,166,255,0.08)',
     inputs:[], outputs:['access_token','refresh_token'],
     configFields:[
-      {k:'clientId',    label:'Client ID',     type:'text'},
-      {k:'clientSecret',label:'Client Secret', type:'password'},
-      {k:'scope',       label:'Scope',         type:'text', ph:'openid'},
+      {k:'clientId',        label:'Client ID',          type:'text'},
+      {k:'clientSecret',    label:'Client Secret',      type:'password'},
+      {k:'scope',           label:'Scope',              type:'text', ph:'openid'},
+      {k:'issuer',          label:'Assertion Issuer',   type:'text', ph:'https://your-idp.example.com'},
+      {k:'subject',         label:'Subject (NameID)',   type:'email', ph:'user@example.com'},
+      {k:'audience',        label:'Audience',           type:'text', ph:'auto-filled from token endpoint if blank'},
+      {k:'recipient',       label:'Recipient',          type:'text', ph:'auto-filled from token endpoint if blank'},
+      {k:'validityMinutes', label:'Validity (minutes)', type:'text', def:'60'},
     ]
   },
   'pkjwt-token': {
@@ -45,8 +56,15 @@ const STEP_DEFS = {
     bg:'rgba(188,140,255,0.1)',
     inputs:[], outputs:['access_token','refresh_token'],
     configFields:[
-      {k:'clientId',  label:'Client ID', type:'text'},
-      {k:'scope',     label:'Scope',     type:'text', ph:'openid'},
+      {k:'clientId',        label:'Client ID',              type:'text'},
+      {k:'privateJwk',      label:'Private JWK (JSON)',     type:'textarea', ph:'{"kty":"RSA",...}'},
+      {k:'pkjwtAlg',        label:'Assertion Alg',          type:'select', def:'RS256', options:[
+        {value:'RS256', label:'RS256'},
+        {value:'PS256', label:'PS256'},
+        {value:'ES256', label:'ES256'},
+      ]},
+      {k:'validitySeconds', label:'Assertion Validity (s)', type:'text', def:'300'},
+      {k:'scope',           label:'Scope',                  type:'text', ph:'openid'},
     ]
   },
   'dpop-token': {
@@ -88,11 +106,18 @@ const STEP_DEFS = {
     bg:'rgba(45,217,198,0.1)',
     inputs:[], outputs:['access_token','id_token'],
     configFields:[
-      {k:'loginHint',     label:'Login Hint (email)', type:'email'},
-      {k:'bindingMessage',label:'Binding Message',    type:'text'},
-      {k:'clientId',      label:'Client ID',          type:'text'},
-      {k:'clientSecret',  label:'Client Secret',      type:'password'},
-      {k:'scope',         label:'Scope',              type:'text', ph:'openid'},
+      {k:'loginHint',       label:'Login Hint (email)',                 type:'email'},
+      {k:'idTokenHint',     label:'ID Token Hint (alt. to Login Hint)', type:'textarea', ph:'Paste an id_token instead of login_hint'},
+      {k:'bindingMessage',  label:'Binding Message',                   type:'text'},
+      {k:'requestExpiry',   label:'Request Expiry (s, optional)',      type:'text', ph:'e.g. 300'},
+      {k:'clientId',        label:'Client ID',                         type:'text'},
+      {k:'clientAuthMethod',label:'Client Auth',                       type:'select', options:[
+        {value:'basic', label:'Client Secret (Basic)'},
+        {value:'pkjwt', label:'Private Key JWT'},
+      ]},
+      {k:'clientSecret',    label:'Client Secret',      type:'password', ph:'(if Basic auth)'},
+      {k:'privateJwk',      label:'Private JWK (JSON)', type:'textarea', ph:'{"kty":"RSA",...} (if PKJWT)'},
+      {k:'scope',           label:'Scope',              type:'text', ph:'openid'},
     ]
   },
   'token-exchange': {
@@ -101,9 +126,27 @@ const STEP_DEFS = {
     inputs:[{name:'subject_token', accepts:['access_token','id_token']}],
     outputs:['access_token','id_token','refresh_token'],
     configFields:[
-      {k:'clientId',    label:'App B Client ID',     type:'text'},
-      {k:'clientSecret',label:'App B Client Secret', type:'password'},
-      {k:'scope',       label:'Scope',               type:'text', ph:'openid'},
+      {k:'clientId',        label:'App B Client ID',      type:'text'},
+      {k:'clientAuthMethod',label:'Client Auth',          type:'select', options:[
+        {value:'basic', label:'Client Secret (Basic)'},
+        {value:'pkjwt', label:'Private Key JWT'},
+      ]},
+      {k:'clientSecret',    label:'App B Client Secret',  type:'password', ph:'(if Basic auth)'},
+      {k:'privateJwk',      label:'Private JWK (JSON)',   type:'textarea', ph:'{"kty":"RSA",...} (if PKJWT)'},
+      {k:'scope',           label:'Scope',                type:'text', ph:'openid'},
+      {k:'requestedTokenType', label:'Requested Token Type', type:'select', options:[
+        {value:'', label:'(default: access_token)'},
+        {value:'urn:ietf:params:oauth:token-type:access_token', label:'access_token'},
+        {value:'urn:ietf:params:oauth:token-type:id_token',     label:'id_token'},
+        {value:'urn:ietf:params:oauth:token-type:jwt',          label:'jwt'},
+      ]},
+      {k:'audience',        label:'Audience (optional)',  type:'text', ph:'target resource server identifier'},
+      {k:'resource',        label:'Resource (optional)',  type:'text', ph:'target resource URI'},
+      {k:'actorToken',      label:'Actor Token (optional, for delegation)', type:'textarea'},
+      {k:'actorTokenType',  label:'Actor Token Type',     type:'select', options:[
+        {value:'access_token', label:'access_token'},
+        {value:'id_token',     label:'id_token'},
+      ]},
     ]
   },
   'mfa-list-factors': {
@@ -133,10 +176,18 @@ const STEP_DEFS = {
     inputs:[],
     outputs:['access_token','id_token'],
     configFields:[
-      {k:'clientId',   label:'Client ID',     type:'text'},
-      {k:'acrValues',  label:'ACR Values',    type:'text', def:'urn:okta:loa:2fa:any', ph:'urn:okta:loa:2fa:any'},
-      {k:'scope',      label:'Scope',         type:'text', ph:'openid profile email'},
-      {k:'redirectUri',label:'Redirect URI',  type:'text', def:'http://localhost:3001/oauth/callback'},
+      {k:'clientId',        label:'Client ID',     type:'text'},
+      {k:'acrValues',       label:'ACR Values',    type:'text', def:'urn:okta:loa:2fa:any', ph:'urn:okta:loa:2fa:any'},
+      {k:'scope',           label:'Scope',         type:'text', ph:'openid profile email'},
+      {k:'redirectUri',     label:'Redirect URI',  type:'text', def:'http://localhost:3001/oauth/callback'},
+      {k:'maxAge',          label:'Max Age (seconds, optional)', type:'text', ph:'0 = force re-auth (recommended for step-up demos)'},
+      {k:'clientAuthMethod',label:'Client Auth',   type:'select', options:[
+        {value:'none',  label:'None (public client)'},
+        {value:'basic', label:'Client Secret (Basic)'},
+        {value:'pkjwt', label:'Private Key JWT'},
+      ]},
+      {k:'clientSecret',    label:'Client Secret',      type:'password', ph:'(if Basic auth)'},
+      {k:'privateJwk',      label:'Private JWK (JSON)', type:'textarea', ph:'{"kty":"RSA",...} (if PKJWT)'},
     ]
   },
   'token-inspect': {
@@ -455,6 +506,8 @@ function renderPipeline() {
   drop.style.cssText = 'border:2px dashed var(--border);border-radius:10px;padding:20px;text-align:center;color:var(--text-muted);font-size:0.8rem;margin-top:8px;cursor:pointer;';
   drop.innerHTML = '<i class="bi bi-plus-circle me-1"></i>Drop a step here or click in the catalog';
   container.appendChild(drop);
+
+  renderNetworkPanel();
 }
 
 function renderStepCard(step, idx) {
@@ -538,6 +591,7 @@ function renderStepCard(step, idx) {
       <span class="step-title" style="color:${def.color}">${escHtml(def.label)}</span>
       ${statusBadgeHtml}
       <div class="d-flex gap-1 ms-2">
+        ${step.networkLog?.length ? `<button class="btn btn-outline-secondary btn-sm" onclick="event.stopPropagation();scrollToNetworkGroup('${step.id}')" title="Show network activity for this step"><i class="bi bi-activity"></i></button>` : ''}
         ${idx > 0 ? `<button class="btn btn-outline-secondary btn-sm" onclick="moveStep('${step.id}',-1)" title="Move up"><i class="bi bi-arrow-up"></i></button>` : ''}
         ${idx < chain.length-1 ? `<button class="btn btn-outline-secondary btn-sm" onclick="moveStep('${step.id}',1)" title="Move down"><i class="bi bi-arrow-down"></i></button>` : ''}
         <button class="btn btn-outline-secondary btn-sm" onclick="removeStep('${step.id}')" title="Remove" style="color:var(--red)"><i class="bi bi-x"></i></button>
@@ -589,6 +643,95 @@ let _chainRunning  = false;
 let _chainAborted  = false;
 let _chainStartIdx = 0; // index to resume/retry from
 
+// Normalizes the heterogeneous backend trace shapes (requestDetails/response,
+// or steps[]) into one consistent array the network panel can render generically.
+function _toNetworkLog(r) {
+  if (!r) return [];
+  if (Array.isArray(r.steps)) return r.steps; // already in {type,label,...} shape (DPoP, token-revoke)
+  const log = [];
+  const url = r.tokenEndpoint || r.endpoint || r.introspectEndpoint;
+  if (r.requestDetails) {
+    log.push({ type:'request', label:'Request', method:r.requestDetails.method||'POST', url:r.requestDetails.url||url, headers:r.requestDetails.headers, body:r.requestDetails.body, durationMs:r.durationMs });
+  }
+  if (r.response || r.error) {
+    log.push({ type:'response', label:`Response: HTTP ${r.statusCode||'—'}`, statusCode:r.statusCode, data:r.response||r.error });
+  }
+  if (r.pollRequestDetails) {
+    log.push({ type:'request', label:'Poll Request', method:r.pollRequestDetails.method||'POST', url:r.pollRequestDetails.url, headers:r.pollRequestDetails.headers, body:r.pollRequestDetails.body });
+  }
+  return log;
+}
+
+// ─── Live network activity panel ───────────────────────────────────────────────
+
+function openNetworkPanel() {
+  const panel = document.getElementById('networkPanel');
+  const btn = document.getElementById('networkToggleBtn');
+  if (panel && !panel.classList.contains('open')) panel.classList.add('open');
+  if (btn) btn.classList.add('active');
+}
+
+function toggleNetworkPanel() {
+  const panel = document.getElementById('networkPanel');
+  const btn = document.getElementById('networkToggleBtn');
+  if (!panel) return;
+  const willOpen = !panel.classList.contains('open');
+  panel.classList.toggle('open', willOpen);
+  if (btn) btn.classList.toggle('active', willOpen);
+}
+
+function scrollToStepCard(stepId) {
+  const card = document.getElementById(`card-${stepId}`);
+  if (!card) return;
+  card.scrollIntoView({ behavior:'smooth', block:'center' });
+  card.classList.add('flash');
+  setTimeout(() => card.classList.remove('flash'), 900);
+}
+
+function scrollToNetworkGroup(stepId) {
+  const group = document.getElementById(`netgroup-${stepId}`);
+  if (!group) return;
+  openNetworkPanel();
+  group.scrollIntoView({ behavior:'smooth', block:'nearest' });
+  group.classList.add('flash');
+  setTimeout(() => group.classList.remove('flash'), 900);
+}
+
+function renderNetworkPanel() {
+  const body = document.getElementById('networkPanelBody');
+  if (!body) return;
+
+  if (!chain.length) {
+    body.innerHTML = `<div style="color:var(--text-muted);font-size:0.8rem;padding:20px 8px;text-align:center">Run the chain to see live requests here.</div>`;
+    return;
+  }
+
+  body.innerHTML = chain.map((step, idx) => {
+    const def = STEP_DEFS[step.type];
+    if (!def) return '';
+    const isLive = step.status === 'running';
+    const entries = (step.networkLog || []).map(renderNetworkEntry).join('');
+    return `<div class="network-step-group${isLive ? ' live' : ''}" id="netgroup-${step.id}">
+      <div class="network-step-group-header" onclick="scrollToStepCard('${step.id}')">
+        <span class="step-icon" style="width:20px;height:20px;font-size:0.7rem;background:${def.bg};color:${def.color}"><i class="bi ${def.icon}"></i></span>
+        <span>Step ${idx + 1} — ${escHtml(def.label)}</span>
+        ${isLive ? '<span class="spinner-border spinner-border-sm ms-auto"></span>' : ''}
+      </div>
+      ${entries || `<div class="network-entry" style="color:var(--text-muted)">${step.status === 'idle' ? 'Not run yet' : 'Waiting…'}</div>`}
+    </div>`;
+  }).join('');
+
+  document.querySelectorAll('#networkPanelBody [data-bs-toggle="popover"]').forEach(el => {
+    if (!el._popoverInited && window.bootstrap?.Popover) {
+      new bootstrap.Popover(el, { container: 'body' });
+      el._popoverInited = true;
+    }
+  });
+
+  const live = body.querySelector('.network-step-group.live');
+  if (live) live.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
 async function runChain(fromIdx = 0) {
   if (_chainRunning) { toast('Chain is already running', 'warning'); return; }
   if (!chain.length) { toast('Add some steps first', 'warning'); return; }
@@ -601,6 +744,7 @@ async function runChain(fromIdx = 0) {
   const stopBtn = document.getElementById('stopBtn');
   setLoading(runBtn, true, '<i class="bi bi-play-fill me-1"></i>Running…');
   if (stopBtn) stopBtn.style.display = '';
+  openNetworkPanel();
 
   document.getElementById('runLog').style.display = '';
   if (fromIdx === 0) {
@@ -646,6 +790,7 @@ async function runChain(fromIdx = 0) {
     }
 
     step.result = result;
+    step.networkLog = _toNetworkLog(result);
     step.status = result.success ? 'success' : 'error';
 
     if (result.outputs) {
@@ -858,23 +1003,12 @@ function showStepResult(stepId) {
     html = renderTokenBadges(r.decoded) + renderClaimsTable(r.decoded.payload);
   }
 
-  // ── token-revoke: show the two-step timeline ────────────────────────────────
+  // ── token-revoke: show the two-step timeline (shared renderer with the network panel) ─
   else if (step.type === 'token-revoke') {
     const verdict = r.revoked
       ? `<div style="color:var(--green);font-size:0.85rem;font-weight:600;margin-bottom:12px">✓ Token successfully revoked — active: false confirmed via introspect</div>`
       : `<div style="color:var(--yellow);font-size:0.85rem;font-weight:600;margin-bottom:12px">⚠ Revoke sent — introspect verification pending</div>`;
-    html = verdict + (r.steps||[]).map((s,i) => {
-      const ok = s.success !== false;
-      return `<details${i===((r.steps||[]).length-1)?' open':''} style="margin-bottom:6px">
-        <summary style="cursor:pointer;padding:7px 10px;background:var(--surface2);border-radius:7px;font-size:0.8rem;list-style:none;display:flex;align-items:center;gap:8px">
-          <span style="width:8px;height:8px;border-radius:50%;background:${ok?'var(--green)':'var(--red)'};flex-shrink:0"></span>
-          <span style="font-weight:600">${escHtml(s.label)}</span>
-          ${s.statusCode?`<span style="color:var(--text-muted);font-size:0.72rem;margin-left:auto">HTTP ${s.statusCode} · ${s.durationMs}ms</span>`:''}
-          ${s.note?`<span style="font-size:0.7rem;color:var(--text-muted)">— ${escHtml(s.note)}</span>`:''}
-        </summary>
-        <div class="code-block json" style="margin:4px 0 0;max-height:200px">${escHtml(JSON.stringify(s.response||s.body||s.error||{},null,2))}</div>
-      </details>`;
-    }).join('');
+    html = verdict + (r.steps || []).map(renderNetworkEntry).join('');
   }
 
   // ── all token-producing steps: full JWT decode (same as standalone pages) ───
@@ -919,6 +1053,14 @@ function showStepResult(stepId) {
   const firstTab = document.querySelector(`#stepResultContent .tabs-nav .tab-btn`);
   if (firstTab) firstTab.click();
 
+  // In a full-result modal (as opposed to the live network panel) every
+  // timeline entry should start expanded — the user already opted in to
+  // seeing full detail by opening the modal.
+  document.querySelectorAll('#stepResultContent .flow-item-body').forEach(el => el.classList.add('open'));
+  document.querySelectorAll('#stepResultContent [data-bs-toggle="popover"]').forEach(el => {
+    if (!el._popoverInited && window.bootstrap?.Popover) { new bootstrap.Popover(el, { container: 'body' }); el._popoverInited = true; }
+  });
+
   document.getElementById('stepResultModal').style.display = 'flex';
 
   _stepModalKeyHandler = (e) => { if (e.key === 'Escape') closeStepModal(); };
@@ -940,25 +1082,56 @@ async function executeStep(step, inputs, domain, sid) {
       return await execAuthCode(step, stepDomain, stepSid);
 
     case 'client-creds': {
+      const authMethod = c.clientAuthMethod || 'basic';
+      let privateJwk;
+      if (authMethod === 'pkjwt' && c.privateJwk) {
+        try { privateJwk = JSON.parse(c.privateJwk); } catch { return { success:false, error:'Invalid Private JWK JSON', outputs:{} }; }
+      }
       const r = await fetch('/api/oauth/client-creds', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId, clientSecret:c.clientSecret, scope:(c.scope||'openid').split(/\s+/) })
+        body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId,
+          clientSecret: authMethod === 'basic' ? c.clientSecret : undefined,
+          privateJwk:   authMethod === 'pkjwt' ? privateJwk : undefined,
+          scope:(c.scope||'openid').split(/\s+/) })
       }).then(r=>r.json());
       const at = r.response?.access_token;
       return { success:r.success, outputs:{ access_token:at },
         durationMs:r.durationMs, summary:_tokenSummary(at),
+        requestDetails:r.requestDetails, response:r.response,
         error:!r.success?(r.response?.error_description||`HTTP ${r.statusCode}`):null };
     }
 
     case 'token-exchange': {
+      const authMethod = c.clientAuthMethod || 'basic';
+      let privateJwk;
+      if (authMethod === 'pkjwt' && c.privateJwk) {
+        try { privateJwk = JSON.parse(c.privateJwk); } catch { return { success:false, error:'Invalid Private JWK JSON', outputs:{} }; }
+      }
+      // Derive subject_token_type from which output the binding actually points at
+      // (RFC 8693 §2.1) — sending the wrong hint here is a common footgun.
+      const SUBJ_TYPES = {
+        access_token:  'urn:ietf:params:oauth:token-type:access_token',
+        id_token:      'urn:ietf:params:oauth:token-type:id_token',
+      };
+      const boundOutName = step.bindings.subject_token?.outputName;
+      const subjectTokenType = SUBJ_TYPES[boundOutName] || SUBJ_TYPES.access_token;
+
       const r = await fetch('/api/token-exchange/exchange', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId, clientSecret:c.clientSecret,
-          subjectToken:inputs.subject_token, subjectTokenType:'urn:ietf:params:oauth:token-type:access_token', scope:(c.scope||'openid').split(/\s+/) })
+        body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId,
+          clientSecret: authMethod === 'basic' ? c.clientSecret : undefined,
+          privateJwk:   authMethod === 'pkjwt' ? privateJwk : undefined,
+          subjectToken:inputs.subject_token, subjectTokenType,
+          requestedTokenType: c.requestedTokenType || undefined,
+          audience: c.audience || undefined, resource: c.resource || undefined,
+          actorToken: c.actorToken || undefined,
+          actorTokenType: c.actorToken ? (SUBJ_TYPES[c.actorTokenType] || c.actorTokenType) : undefined,
+          scope:(c.scope||'openid').split(/\s+/) })
       }).then(r=>r.json());
       const at = r.response?.access_token;
       return { success:r.success, outputs:{ access_token:at, id_token:r.response?.id_token, refresh_token:r.response?.refresh_token },
         durationMs:r.durationMs, summary:_tokenSummary(at),
+        requestDetails:r.requestDetails, response:r.response,
         error:!r.success?(r.response?.error_description||r.response?.error||`HTTP ${r.statusCode}`):null };
     }
 
@@ -975,33 +1148,41 @@ async function executeStep(step, inputs, domain, sid) {
       if (!token) return { success:false, error:'No token provided' };
       const cid = c.clientId || G().clientId;
       const csec = c.clientSecret || G().clientSecret;
+      // Derive tokenTypeHint from which output the binding actually points at,
+      // instead of always assuming access_token.
+      const boundOutName = step.bindings.token?.outputName;
+      const tokenTypeHint = boundOutName === 'refresh_token' ? 'refresh_token' : 'access_token';
       const r = await fetch('/api/token/revoke-and-verify', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:cid, clientSecret:csec, token, tokenTypeHint:'access_token' })
+        body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:cid, clientSecret:csec, token, tokenTypeHint })
       }).then(r=>r.json());
-      return { success:r.revoked, outputs:{}, revoked:r.revoked,
+      return { success:r.revoked, outputs:{}, revoked:r.revoked, steps:r.steps,
         durationMs: r.steps?.reduce((t,s) => t+(s.durationMs||0), 0),
         error:!r.revoked?'Revoke sent but token may still be active (propagation)':null };
     }
 
     case 'pkjwt-token': {
-      // Generate assertion from the stored private JWK, or use configAssertion
-      let body = { oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId, scope:(c.scope||'openid').split(/\s+/), grantType:'client_credentials' };
-      if (c.privateJwk) {
-        try {
-          const kp = await fetch('/api/pkjwt/generate-assertion', {
-            method:'POST', headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({ privateJwk:JSON.parse(c.privateJwk), clientId:c.clientId,
-              audience: (c.authServerId||stepSid) ? `https://${stepDomain}/oauth2/${c.authServerId||stepSid}/v1/token` : `https://${stepDomain}/oauth2/v1/token`,
-              validitySeconds:300 })
-          }).then(r=>r.json());
-          body.clientAssertion = kp.assertion;
-        } catch {}
-      }
-      const r = await fetch('/api/pkjwt/exchange-token', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body) }).then(r=>r.json());
+      if (!c.privateJwk) return { success:false, error:'Private JWK is required — paste one or generate via /pkjwt.html', outputs:{} };
+      let privateJwk;
+      try { privateJwk = JSON.parse(c.privateJwk); } catch { return { success:false, error:'Invalid Private JWK JSON', outputs:{} }; }
+      if (c.pkjwtAlg) privateJwk.alg = c.pkjwtAlg;
+
+      const audience = stepSid ? `https://${stepDomain}/oauth2/${stepSid}/v1/token` : `https://${stepDomain}/oauth2/v1/token`;
+      const asrt = await fetch('/api/pkjwt/generate-assertion', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ privateJwk, clientId:c.clientId, audience, validitySeconds:parseInt(c.validitySeconds)||300 })
+      }).then(r=>r.json());
+      if (asrt.error) return { success:false, error:'Assertion generation failed: '+asrt.error, outputs:{} };
+
+      const r = await fetch('/api/pkjwt/exchange-token', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId,
+          clientAssertion:asrt.assertion, scope:(c.scope||'openid').split(/\s+/), grantType:'client_credentials' })
+      }).then(r=>r.json());
       const at = r.response?.access_token;
       return { success:r.success, outputs:{ access_token:at, refresh_token:r.response?.refresh_token },
         durationMs:r.durationMs, summary:_tokenSummary(at),
+        requestDetails:r.requestDetails, response:r.response,
         error:!r.success?(r.response?.error_description||`HTTP ${r.statusCode}`):null };
     }
 
@@ -1119,15 +1300,28 @@ async function executeStep(step, inputs, domain, sid) {
     }
 
     case 'step-up-auth':
-      return await execAuthCode({ ...step, config: { ...c, acrValues: c.acrValues } }, stepDomain, sid);
+      return await execAuthCode({ ...step, config: { ...c } }, stepDomain, sid);
 
     case 'ciba': {
+      const authMethod = c.clientAuthMethod || 'basic';
+      let privateJwk;
+      if (authMethod === 'pkjwt' && c.privateJwk) {
+        try { privateJwk = JSON.parse(c.privateJwk); } catch { return { success:false, error:'Invalid Private JWK JSON', outputs:{} }; }
+      }
       const authRes = await fetch('/api/ciba/backchannel-authorize', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId, clientSecret:c.clientSecret,
-          loginHint:c.loginHint, bindingMessage:c.bindingMessage, scope:(c.scope||'openid').split(/\s+/) })
+        body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId,
+          clientSecret: authMethod === 'basic' ? c.clientSecret : undefined,
+          privateJwk:   authMethod === 'pkjwt' ? privateJwk : undefined,
+          loginHint:c.loginHint || undefined, idTokenHint:c.idTokenHint || undefined,
+          bindingMessage:c.bindingMessage,
+          requestExpiry: c.requestExpiry ? parseInt(c.requestExpiry, 10) : undefined,
+          scope:(c.scope||'openid').split(/\s+/) })
       }).then(r=>r.json());
-      if (!authRes.success) return { success:false, error:authRes.response?.error_description||'CIBA authorize failed', outputs:{} };
+      if (!authRes.success) {
+        return { success:false, error:authRes.response?.error_description||'CIBA authorize failed', outputs:{},
+          requestDetails:authRes.requestDetails, response:authRes.response };
+      }
 
       // Poll for result (up to 60s)
       const authReqId = authRes.response.auth_req_id;
@@ -1137,16 +1331,55 @@ async function executeStep(step, inputs, domain, sid) {
         await new Promise(r => setTimeout(r, interval));
         const poll = await fetch('/api/ciba/poll', {
           method:'POST', headers:{'Content-Type':'application/json'},
-          body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId, clientSecret:c.clientSecret, authReqId, scope:(c.scope||'openid').split(/\s+/) })
+          body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId,
+            clientSecret: authMethod === 'basic' ? c.clientSecret : undefined,
+            privateJwk:   authMethod === 'pkjwt' ? privateJwk : undefined,
+            authReqId, scope:(c.scope||'openid').split(/\s+/) })
         }).then(r=>r.json());
         if (poll.success) {
           const at = poll.response?.access_token;
           return { success:true, outputs:{ access_token:at, id_token:poll.response?.id_token },
-            durationMs: Date.now()-t0ciba, summary:_tokenSummary(at) };
+            durationMs: Date.now()-t0ciba, summary:_tokenSummary(at),
+            requestDetails: authRes.requestDetails, response: poll.response,
+            pollRequestDetails: poll.requestDetails };
         }
         if (poll.denied || poll.expired) return { success:false, error:poll.denied?'User denied':'Request expired', outputs:{} };
       }
       return { success:false, error:'CIBA timeout (60s)', outputs:{} };
+    }
+
+    case 'saml-bearer': {
+      // Generate (or reuse cached) RSA keypair for this step — cache on step.config
+      // so re-running the step doesn't rotate the signing key every time.
+      if (!c._privateKey || !c._certificate) {
+        const kp = await fetch('/api/generate-keypair', { method:'POST', headers:{'Content-Type':'application/json'}, body:'{}' }).then(r=>r.json());
+        c._privateKey = kp.privateKey; c._certificate = kp.certificate;
+        saveChain();
+      }
+
+      const ep = stepSid ? `https://${stepDomain}/oauth2/${stepSid}/v1/token` : `https://${stepDomain}/oauth2/v1/token`;
+
+      const asrt = await fetch('/api/generate-assertion', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          issuer: c.issuer, subject: c.subject,
+          recipient: c.recipient || ep, audience: c.audience || ep,
+          validityMinutes: parseInt(c.validityMinutes, 10) || 60,
+          privateKey: c._privateKey, certificate: c._certificate
+        })
+      }).then(r=>r.json());
+      if (asrt.error) return { success:false, error:'Assertion generation failed: '+asrt.error, outputs:{} };
+
+      const r = await fetch('/api/exchange-token', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ oktaDomain:stepDomain, authServerId:stepSid, clientId:c.clientId, clientSecret:c.clientSecret,
+          scope:(c.scope||'openid').split(/\s+/), assertion: asrt.base64url })
+      }).then(r=>r.json());
+      const at = r.response?.access_token;
+      return { success:r.success, outputs:{ access_token:at, refresh_token:r.response?.refresh_token },
+        durationMs:r.durationMs, summary:_tokenSummary(at),
+        requestDetails:r.requestDetails, response:r.response, assertionXml: asrt.xml,
+        error:!r.success?(r.response?.error_description||`HTTP ${r.statusCode}`):null };
     }
 
     default:
@@ -1173,6 +1406,7 @@ async function execAuthCode(step, domain, sid) {
       clientSecret: authMethod === 'basic' ? (c.clientSecret || '') : undefined,
       privateJwk:   authMethod === 'pkjwt' ? privateJwk : undefined,
       ...(c.acrValues ? { acrValues: c.acrValues } : {}),
+      ...(c.maxAge !== undefined && c.maxAge !== '' ? { maxAge: parseInt(c.maxAge, 10) } : {}),
     })
   }).then(r=>r.json());
 
@@ -1185,24 +1419,24 @@ async function execAuthCode(step, domain, sid) {
     const popup = window.open(authUrl, 'okta-auth', 'width=600,height=700,left=200,top=100');
 
     let done = false;
-    const finish = (tokens, error, durationMs) => {
+    const finish = (tokens, error, durationMs, requestDetails, tokenEndpoint) => {
       if (done) return; done = true;
       clearInterval(pollTimer);
       window.removeEventListener('message', msgHandler);
       if (tokens) resolve({ success:true,
         outputs:{ access_token:tokens.access_token, id_token:tokens.id_token, refresh_token:tokens.refresh_token },
-        durationMs,
+        durationMs, requestDetails, response:tokens, tokenEndpoint,
         summary: _tokenSummary(tokens.access_token) });
       else resolve({ success:false, error: error || 'Auth failed', outputs:{} });
     };
 
-    const msgHandler = (e) => { if (e.data?.type==='oauth-callback') finish(e.data.tokens, e.data.error, e.data.durationMs); };
+    const msgHandler = (e) => { if (e.data?.type==='oauth-callback') finish(e.data.tokens, e.data.error, e.data.durationMs, e.data.requestDetails, e.data.tokenEndpoint); };
     window.addEventListener('message', msgHandler);
 
     const pollTimer = setInterval(async () => {
       const s = await fetch(`/api/oauth/status/${flowId}`).then(r=>r.json()).catch(()=>null);
       if (!s) return;
-      if (s.status === 'success') finish(s.tokens, null, s.durationMs);
+      if (s.status === 'success') finish(s.tokens, null, s.durationMs, s.requestDetails, s.tokenEndpoint);
       if (s.status === 'error')   finish(null, s.error);
     }, 1500);
 

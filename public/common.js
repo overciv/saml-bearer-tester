@@ -484,6 +484,119 @@ function statusBadge(code) {
   return `<span class="status-badge ${ok ? 'status-ok' : 'status-err'}">HTTP ${code || 'Error'}</span>`;
 }
 
+// ─── OAuth/OIDC request parameter reference ────────────────────────────────────
+// Sibling to CLAIM_META (which covers JWT payload *claims*) — this covers
+// request/response *parameters* seen in the network activity panel. Surfaced via
+// click-triggered Bootstrap Popover so raw JSON stays compact and readable while
+// still being explorable on demand.
+const PARAM_META = {
+  response_type:        { std:'RFC 6749 §3.1.1', desc:'Tells the authorize endpoint which grant flow to run. "code" = Authorization Code.' },
+  redirect_uri:         { std:'RFC 6749 §3.1.2', desc:'Where Okta redirects after login. Must exactly match a URI registered on the app.' },
+  scope:                { std:'RFC 6749 §3.3',   desc:'Space-delimited list of permissions being requested.' },
+  state:                { std:'RFC 6749 §10.12', desc:'Opaque value round-tripped to the client to prevent CSRF on the redirect.' },
+  code_challenge:       { std:'RFC 7636 §4.2',   desc:'PKCE — SHA-256 hash of the code_verifier, sent at /authorize.' },
+  code_challenge_method:{ std:'RFC 7636 §4.3',   desc:'Hash method for code_challenge. Okta requires S256.' },
+  code_verifier:        { std:'RFC 7636 §4.1',   desc:'Random secret the client keeps; presented at /token to prove it started the flow.' },
+  code:                 { std:'RFC 6749 §4.1.2', desc:'One-time authorization code returned to redirect_uri, exchanged for tokens.' },
+  acr_values:           { std:'OIDC Core §3.1.2.1', desc:'Requested Authentication Context Class — used by Okta to demand a specific assurance level (step-up auth).' },
+  max_age:              { std:'OIDC Core §3.1.2.1', desc:'Maximum seconds since last authentication. 0 forces Okta to re-prompt even with an active SSO session.' },
+  client_id:             { std:'RFC 6749 §2.2',   desc:'Public identifier for the registered Okta app.' },
+  client_secret:         { std:'RFC 6749 §2.3.1', desc:'Confidential app secret, sent via HTTP Basic auth on confidential clients.' },
+  client_assertion_type:{ std:'RFC 7523 §3',     desc:'Fixed URN identifying the assertion format — always urn:...:jwt-bearer for Private Key JWT.' },
+  client_assertion:      { std:'RFC 7523 §3',     desc:'Self-signed JWT proving possession of the app\'s private key — replaces client_secret.' },
+  grant_type:            { std:'RFC 6749 §1.3',   desc:'Identifies which OAuth flow this token request is executing.' },
+  refresh_token:         { std:'RFC 6749 §6',     desc:'Long-lived credential used to obtain new access tokens without re-authenticating.' },
+  subject_token:         { std:'RFC 8693 §2.1',   desc:'The token being exchanged — identifies who/what the new token should represent.' },
+  subject_token_type:    { std:'RFC 8693 §3',     desc:'URN identifying the type of subject_token (access_token, id_token, etc). Must match what was actually bound.' },
+  actor_token:           { std:'RFC 8693 §2.1',   desc:'Optional token identifying the party acting on behalf of the subject (delegation).' },
+  actor_token_type:      { std:'RFC 8693 §3',     desc:'URN identifying the type of actor_token.' },
+  requested_token_type:  { std:'RFC 8693 §2.1',   desc:'URN for the token type the client wants back.' },
+  audience:              { std:'RFC 8693 §2.1',   desc:'Logical name of the target service the new token should be valid for.' },
+  resource:              { std:'RFC 8693 §2.1 / RFC 8707', desc:'URI of the target resource the new token should be valid for.' },
+  assertion:             { std:'RFC 7522 §2.1',   desc:'Base64url-encoded, signed SAML assertion presented as a bearer credential.' },
+  login_hint:            { std:'OIDC Core / CIBA', desc:'Identifies which end-user Okta should authenticate (e.g. their email).' },
+  id_token_hint:         { std:'CIBA Core §7.1',  desc:'Alternative to login_hint — an existing ID token identifying the user.' },
+  binding_message:       { std:'CIBA Core §7.1',  desc:'Human-readable string shown to the user on their device to bind the request to this session.' },
+  auth_req_id:           { std:'CIBA Core §11',   desc:'Identifier for the pending backchannel auth request, used when polling for the result.' },
+  request_expiry:        { std:'CIBA Core §7.1',  desc:'Seconds the backchannel auth request stays valid before expiring.' },
+  dpop:                  { std:'RFC 9449 §4',     desc:'HTTP header carrying a signed proof-of-possession JWT, binding the request to a specific key pair.' },
+  token_type_hint:       { std:'RFC 7009 §2.1',   desc:'Optional hint telling the server whether the token is an access_token or refresh_token, to speed up revocation lookup.' },
+  username:              { std:'RFC 6749 §4.3.2', desc:'Resource owner\'s username — ROPC only; discouraged by Okta for production use.' },
+  password:              { std:'RFC 6749 §4.3.2', desc:'Resource owner\'s password — sent in the clear to the token endpoint; ROPC only.' },
+};
+
+// Wraps recognized OAuth/OIDC parameter names inside a pre-escaped JSON string
+// with Bootstrap Popover triggers, so users can click any param name in a
+// request/response body to see its spec reference + description.
+function annotateParamsHtml(jsonEscaped) {
+  return jsonEscaped.replace(/&quot;([a-z_]+)&quot;:/g, (m, key) => {
+    const meta = PARAM_META[key];
+    if (!meta) return m;
+    const content = `&lt;div style=&#39;font-size:0.72rem&#39;&gt;&lt;strong style=&#39;color:var(--blue)&#39;&gt;${escHtml(meta.std)}&lt;/strong&gt;&lt;br&gt;${escHtml(meta.desc)}&lt;/div&gt;`;
+    return `&quot;<span class="param-chip" tabindex="0" data-bs-toggle="popover" data-bs-trigger="focus" data-bs-html="true" data-bs-content="${content}">${key}</span>&quot;:`;
+  });
+}
+
+// Renders one entry of a request/response timeline. Handles both the
+// discriminated-union shape used by DPoP/CIBA-poll ({type:'proof'|'request'|
+// 'response'|'nonce', ...}) and the plain {label, method, url, statusCode,
+// body, response, note, success} shape used by revokeAndVerify/admin-api
+// multi-step traces (no `type` field — inferred from `success`).
+function renderNetworkEntry(step) {
+  let iconClass, icon, bodyHtml;
+  const type = step.type || (step.success === false ? 'response-err' : step.statusCode != null ? 'response' : 'request');
+
+  if (type === 'proof') {
+    iconClass = 'proof'; icon = 'bi-fingerprint';
+    bodyHtml = `
+      <div class="row g-3">
+        <div class="col-md-5">
+          <div style="font-size:0.72rem;color:var(--text-muted);mb-1">Header</div>
+          <div class="code-block json" style="max-height:160px">${annotateParamsHtml(escHtml(JSON.stringify(step.decodedHeader, null, 2)))}</div>
+        </div>
+        <div class="col-md-7">
+          <div style="font-size:0.72rem;color:var(--text-muted);mb-1">Payload</div>
+          <div class="code-block json" style="max-height:160px">${annotateParamsHtml(escHtml(JSON.stringify(step.decodedPayload, null, 2)))}</div>
+        </div>
+        <div class="col-12">
+          <div style="font-size:0.72rem;color:var(--text-muted);mb-1">Raw JWT</div>
+          <div class="code-block base64" style="max-height:60px">${escHtml(step.proof)}</div>
+        </div>
+      </div>`;
+  } else if (type === 'request') {
+    iconClass = 'request'; icon = 'bi-arrow-up-circle';
+    bodyHtml = `<div class="code-block json" style="max-height:200px">${annotateParamsHtml(escHtml(JSON.stringify({method: step.method, url: step.url, headers: step.headers, body: step.body}, null, 2)))}</div>
+      ${step.durationMs != null ? `<div class="mt-2" style="font-size:0.72rem;color:var(--text-muted)">${step.durationMs}ms</div>` : ''}
+      ${step.note ? `<div class="mt-2" style="font-size:0.78rem;color:var(--text-muted)">${escHtml(step.note)}</div>` : ''}`;
+  } else if (type === 'response' || type === 'response-ok' || type === 'response-err') {
+    const ok = step.success !== false && (step.statusCode == null || (step.statusCode >= 200 && step.statusCode < 300));
+    iconClass = ok ? 'response-ok' : 'response-err';
+    icon = ok ? 'bi-check-circle' : 'bi-x-circle';
+    bodyHtml = `${step.statusCode != null ? `<div class="mb-2">${statusBadge(step.statusCode)}</div>` : ''}
+      <div class="code-block json" style="max-height:200px">${annotateParamsHtml(escHtml(JSON.stringify(step.data ?? step.response ?? step.body ?? step.error ?? {}, null, 2)))}</div>
+      ${step.note ? `<div class="mt-2" style="font-size:0.78rem;color:var(--text-muted)">${escHtml(step.note)}</div>` : ''}`;
+    if (step.responseHeaders?.['dpop-nonce']) {
+      bodyHtml += `<div class="mt-2 p-2" style="background:rgba(210,153,34,0.1);border-radius:6px;font-size:0.78rem;"><i class="bi bi-key me-1" style="color:var(--yellow)"></i><strong>dpop-nonce:</strong> <code>${escHtml(step.responseHeaders['dpop-nonce'])}</code></div>`;
+    }
+  } else if (type === 'nonce') {
+    iconClass = 'nonce'; icon = 'bi-arrow-repeat';
+    bodyHtml = `<div style="font-size:0.82rem">${escHtml(step.detail)}</div>
+      <div class="mt-2 p-2" style="background:rgba(210,153,34,0.08);border-radius:6px;font-size:0.78rem;">nonce: <code>${escHtml(step.nonce)}</code></div>`;
+  } else {
+    iconClass = 'request'; icon = 'bi-info-circle';
+    bodyHtml = `<div class="code-block json" style="max-height:200px">${annotateParamsHtml(escHtml(JSON.stringify(step, null, 2)))}</div>`;
+  }
+
+  return `<div class="flow-item">
+    <div class="flow-item-header" onclick="this.nextElementSibling.classList.toggle('open')">
+      <div class="flow-icon ${iconClass}"><i class="bi ${icon}"></i></div>
+      <span class="flow-item-title">${escHtml(step.label || '')}</span>
+      <span class="flow-item-meta"><i class="bi bi-chevron-down"></i></span>
+    </div>
+    <div class="flow-item-body">${bodyHtml}</div>
+  </div>`;
+}
+
 // Inject animation style once
 const _styleEl = document.createElement('style');
 _styleEl.textContent = `@keyframes fadeInUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`;
