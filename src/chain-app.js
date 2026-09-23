@@ -16,8 +16,12 @@ function domainOf(u) {
   try { return new URL(normalizeUrl(u)).host; } catch { return u; }
 }
 
-function chainAppRedirectUri() {
-  const base = process.env.APP_BASE_URL || 'http://localhost:3001';
+// Mirrors src/auth.js's redirectUri(req) fallback pattern — prefer the
+// configured APP_BASE_URL, but fall back to whatever host the request
+// actually came in on (so this also works correctly on Vercel preview
+// deployments or any host where APP_BASE_URL wasn't set).
+function chainAppRedirectUri(req) {
+  const base = process.env.APP_BASE_URL || (req ? `${req.protocol}://${req.get('host')}` : 'http://localhost:3001');
   return `${base.replace(/\/+$/, '')}/oauth/callback`;
 }
 
@@ -31,14 +35,14 @@ function getChainApp(tenant, chainId) {
 
 // Idempotent: if this workspace already has an app on record, return it
 // without calling Okta again.
-async function createChainApp({ tenant, chainId, chainLabel, user }) {
+async function createChainApp({ tenant, chainId, chainLabel, user, req }) {
   if (!chainId) throw new Error('chainId is required');
   const existing = tenant?.chainApps?.[chainId];
   if (existing) return { exists: true, ...existing };
 
   const oktaDomain = domainOf(tenant.oidcConfiguration.issuer);
   const accessToken = await getManagementToken(tenant.managementCredentials, REDIRECT_URI_SCOPES);
-  const redirectUri = chainAppRedirectUri();
+  const redirectUri = chainAppRedirectUri(req);
 
   const payload = {
     name: 'oidc_client',

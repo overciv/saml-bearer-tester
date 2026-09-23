@@ -133,6 +133,10 @@
   <div class="topbar-title"><i class="bi bi-diagram-3" style="color:var(--blue)"></i>Test Chain Builder</div>
   <div class="ms-auto d-flex gap-2 align-items-center">
     <span id="chainStatus" style="font-size:0.75rem;color:var(--text-muted)"></span>
+    <div class="form-check form-switch d-flex align-items-center gap-1 mb-0" style="font-size:0.75rem" title="Manual: use the Client ID/Secret you enter per step. Auto: create (and let you delete) one Okta app per workspace on first Run.">
+      <input class="form-check-input" type="checkbox" role="switch" id="chainAppModeToggle" onchange="setChainAppMode(this.checked ? 'auto' : 'manual')" style="cursor:pointer">
+      <label class="form-check-label" for="chainAppModeToggle" style="color:var(--text-muted);cursor:pointer">Auto-create App</label>
+    </div>
     <span id="chainAppBadge" style="display:none;font-size:0.72rem;color:var(--text-muted)" title="Okta app auto-created for this Test Chain workspace"></span>
     <button class="btn btn-sm" id="deleteChainAppBtn" style="display:none;color:var(--red);border:1px solid rgba(248,81,73,0.4);background:rgba(248,81,73,0.06)" onclick="deleteChainApp()" title="Delete the Okta app auto-created for this workspace">
       <i class="bi bi-trash me-1"></i>Delete App

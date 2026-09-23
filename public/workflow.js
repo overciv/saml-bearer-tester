@@ -216,6 +216,7 @@ let outputStore = {};  // { 'stepId.outputName': value }
 let dragType = null;
 let chainId = null;    // stable id for this workspace's auto-provisioned Okta app
 let chainApp = null;   // { exists, appId, clientId, clientSecret, redirectUri } | { exists:false }
+let chainAppMode = localStorage.getItem('workflow-chain-app-mode') || 'manual'; // 'manual' | 'auto'
 
 const G = () => JSON.parse(localStorage.getItem('oauthst-global') || '{}');
 
@@ -397,6 +398,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   renderPipeline();
+  renderChainAppModeUI();
   refreshChainApp();
 });
 
@@ -420,7 +422,41 @@ function loadChain() {
   } catch { chain = []; }
 }
 
-// ─── Chain-test Okta app (auto-created on first Run, one per workspace) ──────
+// ─── Chain-test Okta app (auto-created on first Run when in "Auto" mode) ─────
+// Manual mode is the default — you supply your own clientId/clientSecret per
+// step, exactly as before. Switch to Auto to have Run Chain provision (and
+// let you tear down) one Okta app per workspace.
+
+function setChainAppMode(mode) {
+  chainAppMode = mode === 'auto' ? 'auto' : 'manual';
+  localStorage.setItem('workflow-chain-app-mode', chainAppMode);
+  renderChainAppModeUI();
+}
+
+function renderChainAppModeUI() {
+  const toggle = document.getElementById('chainAppModeToggle');
+  if (toggle) toggle.checked = chainAppMode === 'auto';
+  renderChainAppBadge();
+}
+
+// Fills a step's clientId/clientSecret/redirectUri from the auto-created
+// chain app — but only when the field is still empty OR still holds the
+// static STEP_DEFS placeholder value, so a real (auto-created or manually
+// typed) redirect_uri never gets silently overwritten by the raw dev default.
+function applyChainAppToSteps(steps) {
+  if (!chainApp?.exists) return;
+  (steps || chain).forEach(s => {
+    const fields = STEP_DEFS[s.type]?.configFields || [];
+    const isUnset = (k) => {
+      const def = fields.find(f => f.k === k);
+      const v = s.config[k];
+      return !v || (def?.def && v === def.def);
+    };
+    if (fields.some(f => f.k === 'clientId') && isUnset('clientId')) s.config.clientId = chainApp.clientId;
+    if (fields.some(f => f.k === 'clientSecret') && isUnset('clientSecret')) s.config.clientSecret = chainApp.clientSecret;
+    if (fields.some(f => f.k === 'redirectUri') && isUnset('redirectUri')) s.config.redirectUri = chainApp.redirectUri;
+  });
+}
 
 async function refreshChainApp() {
   try {
@@ -434,7 +470,7 @@ function renderChainAppBadge() {
   const badge = document.getElementById('chainAppBadge');
   const btn = document.getElementById('deleteChainAppBtn');
   if (!badge || !btn) return;
-  if (chainApp?.exists) {
+  if (chainAppMode === 'auto' && chainApp?.exists) {
     badge.style.display = '';
     badge.innerHTML = `<i class="bi bi-shield-check me-1"></i>App: ${escHtml(chainApp.clientId || '')}`;
     btn.style.display = '';
@@ -488,7 +524,11 @@ function makeStep(type, id) {
       if (f.k === 'clientSecret' && g.clientSecret) config[f.k] = g.clientSecret;
     });
   }
-  return { id: id || ('s_' + Date.now() + '_' + Math.random().toString(36).slice(2,6)), type, config, bindings: {}, result: null, status: 'idle' };
+  const step = { id: id || ('s_' + Date.now() + '_' + Math.random().toString(36).slice(2,6)), type, config, bindings: {}, result: null, status: 'idle' };
+  // In Auto mode, a step added after the chain app already exists should
+  // pick up its clientId/clientSecret/redirectUri immediately too.
+  if (chainAppMode === 'auto' && chainApp?.exists) applyChainAppToSteps([step]);
+  return step;
 }
 
 function addStep(type) {
@@ -799,7 +839,7 @@ async function runChain(fromIdx = 0) {
   setLoading(runBtn, true, '<i class="bi bi-play-fill me-1"></i>Running…');
   if (stopBtn) stopBtn.style.display = '';
 
-  if (!chainApp?.exists) {
+  if (chainAppMode === 'auto' && !chainApp?.exists) {
     const label = chain.map(s => STEP_DEFS[s.type]?.label || s.type).join(' → ').slice(0, 60);
     setLoading(runBtn, true, '<i class="bi bi-shield-plus me-1"></i>Creating app…');
     try {
@@ -809,14 +849,7 @@ async function runChain(fromIdx = 0) {
       });
       chainApp = await r.json();
       if (!r.ok) throw new Error(chainApp.error || `HTTP ${r.status}`);
-
-      // Only fill fields the user left empty — don't clobber deliberate overrides.
-      chain.forEach(s => {
-        const fields = STEP_DEFS[s.type]?.configFields || [];
-        if (fields.some(f => f.k === 'clientId') && !s.config.clientId) s.config.clientId = chainApp.clientId;
-        if (fields.some(f => f.k === 'clientSecret') && !s.config.clientSecret) s.config.clientSecret = chainApp.clientSecret;
-        if (fields.some(f => f.k === 'redirectUri') && !s.config.redirectUri) s.config.redirectUri = chainApp.redirectUri;
-      });
+      applyChainAppToSteps();
       saveChain();
       renderChainAppBadge();
       toast('Okta test app ready', 'success');

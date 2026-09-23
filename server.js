@@ -93,7 +93,7 @@ app.post('/api/chain-app', async (req, res) => {
   try {
     res.json(await createChainApp({
       tenant: req.tenant, chainId: req.body.chainId, chainLabel: req.body.chainLabel,
-      user: req.session.user
+      user: req.session.user, req
     }));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
