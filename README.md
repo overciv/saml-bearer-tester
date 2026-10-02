@@ -25,7 +25,7 @@ tenant's own IdP, and every tester page below is scoped to it.
 | | Step-Up Auth (`/step-up.html`) | `acr_values` MFA escalation, before/after ACR comparison |
 | MFA & Admin | MFA Manager (`/mfa.html`) | List factors, trigger live push/OTP/TOTP challenges |
 | | Admin API (`/admin.html`) | App lifecycle, audit log, Terraform export |
-| Chaining | Test Chain (`/workflow.html`) | Chain testers together with output-to-input binding |
+| Chaining | Test Chain (`/workflow.html`) | Chain testers together with output-to-input binding; can auto-provision its own Okta app |
 
 **Spec references:**
 [SAML 2.0 Assertion grant](https://developer.okta.com/docs/guides/implement-grant-type/saml2assert/main/) ·
@@ -48,6 +48,24 @@ tenant's own IdP, and every tester page below is scoped to it.
   tenants at once.
 - **Per-page settings** — every tester page's config is saved server-side, scoped to the current
   tenant, so it's consistent across devices/browsers for that tenant (not just `localStorage`).
+
+---
+
+## Test Chain: Manual vs. Auto app mode
+
+The Test Chain builder (`/workflow.html`) has a **Manual / Auto-create App** toggle in its topbar,
+**Manual by default**:
+
+- **Manual mode** — behaves like every other tester page: you type a `clientId`/`clientSecret`
+  per step yourself.
+- **Auto mode** — on the first **Run Chain**, the app provisions one Okta OIDC app for that
+  workspace via the tenant's `management_credentials` (same mechanism as the redirect-uri sync
+  above), fills every step's `clientId`/`clientSecret`/`redirectUri`, and assigns the current user
+  to it so login-based steps (Auth Code, ROPC, Step-Up) work immediately. Credentials are
+  re-synced to every step on every run — including steps added after the app was created — so a
+  step can never silently hold stale values from an earlier manual edit or a previously-saved
+  chain. A **Delete App** button tears it down (deactivate + delete in Okta) when you're done. One
+  app is shared per workspace, keyed by a stable id generated the first time you open the builder.
 
 ---
 
@@ -134,6 +152,7 @@ src/tenant-settings.js  — Per-tenant, per-page settings storage
 src/tenant.js           — resolveTenant middleware (?tenant= query / cookie)
 src/tenant-webhook.js   — POST /api/tenant webhook handler
 src/tenant-provision.js — Syncs this app's redirect_uri onto the tenant's Okta app
+src/chain-app.js        — Test Chain Auto mode: create/delete one Okta app per chain workspace
 src/auth.js             — Always-on, per-tenant login (PKCE + client_secret_basic)
 src/session-store.js    — Storage-backed express-session Store
 src/config.js           — App-wide RS256 signing key (for private_key_jwt test pages)
@@ -150,6 +169,7 @@ public/nav.js           — Shared top navigation, injected into every page
 |--------|------|---------|
 | `POST` | `/api/tenant?secret=...` | Demo Platform webhook — create/update/delete a tenant |
 | `GET/POST` | `/api/tenant-settings/:page` | Per-tenant, per-page settings |
+| `GET/POST/DELETE` | `/api/chain-app/:chainId` | Test Chain Auto mode: read/create/delete the workspace's Okta app |
 | `GET` | `/auth/login`, `/auth/callback`, `/auth/logout` | Tenant-scoped login flow |
 | `GET` | `/auth/jwks` | This app's own JWKS (for private_key_jwt test pages) |
 | `GET` | `/api/auth/me` | Current session user + tenant |

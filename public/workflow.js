@@ -430,6 +430,13 @@ function loadChain() {
 function setChainAppMode(mode) {
   chainAppMode = mode === 'auto' ? 'auto' : 'manual';
   localStorage.setItem('workflow-chain-app-mode', chainAppMode);
+  // Switching into Auto with an app already on record for this workspace
+  // (e.g. re-enabling it) should sync steps immediately, not wait for Run.
+  if (chainAppMode === 'auto' && chainApp?.exists) {
+    applyChainAppToSteps();
+    saveChain();
+    renderPipeline();
+  }
   renderChainAppModeUI();
 }
 
@@ -439,22 +446,20 @@ function renderChainAppModeUI() {
   renderChainAppBadge();
 }
 
-// Fills a step's clientId/clientSecret/redirectUri from the auto-created
-// chain app — but only when the field is still empty OR still holds the
-// static STEP_DEFS placeholder value, so a real (auto-created or manually
-// typed) redirect_uri never gets silently overwritten by the raw dev default.
+// Auto mode means "this whole workspace runs against one shared Okta app" —
+// so every step that has these fields gets synced unconditionally, every
+// time this is called (on app creation, on every Run, on adding a new step,
+// and on switching into Auto mode). There's no "did the user customize this"
+// heuristic here on purpose: an old value left over from global Settings, a
+// previously-saved chain, or a since-deleted chain app is exactly what needs
+// to be overwritten so a step never silently drifts from the current app.
 function applyChainAppToSteps(steps) {
   if (!chainApp?.exists) return;
   (steps || chain).forEach(s => {
     const fields = STEP_DEFS[s.type]?.configFields || [];
-    const isUnset = (k) => {
-      const def = fields.find(f => f.k === k);
-      const v = s.config[k];
-      return !v || (def?.def && v === def.def);
-    };
-    if (fields.some(f => f.k === 'clientId') && isUnset('clientId')) s.config.clientId = chainApp.clientId;
-    if (fields.some(f => f.k === 'clientSecret') && isUnset('clientSecret')) s.config.clientSecret = chainApp.clientSecret;
-    if (fields.some(f => f.k === 'redirectUri') && isUnset('redirectUri')) s.config.redirectUri = chainApp.redirectUri;
+    if (fields.some(f => f.k === 'clientId'))     s.config.clientId     = chainApp.clientId;
+    if (fields.some(f => f.k === 'clientSecret')) s.config.clientSecret = chainApp.clientSecret;
+    if (fields.some(f => f.k === 'redirectUri'))  s.config.redirectUri  = chainApp.redirectUri;
   });
 }
 
@@ -839,27 +844,33 @@ async function runChain(fromIdx = 0) {
   setLoading(runBtn, true, '<i class="bi bi-play-fill me-1"></i>Running…');
   if (stopBtn) stopBtn.style.display = '';
 
-  if (chainAppMode === 'auto' && !chainApp?.exists) {
-    const label = chain.map(s => STEP_DEFS[s.type]?.label || s.type).join(' → ').slice(0, 60);
-    setLoading(runBtn, true, '<i class="bi bi-shield-plus me-1"></i>Creating app…');
-    try {
-      const r = await fetch('/api/chain-app', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chainId, chainLabel: `Test Chain: ${label}` })
-      });
-      chainApp = await r.json();
-      if (!r.ok) throw new Error(chainApp.error || `HTTP ${r.status}`);
-      applyChainAppToSteps();
-      saveChain();
-      renderChainAppBadge();
-      toast('Okta test app ready', 'success');
-    } catch (e) {
-      toast(`Could not auto-create Okta app: ${e.message}`, 'error');
-      _chainRunning = false;
-      setLoading(runBtn, false, '<i class="bi bi-play-fill me-1"></i>Run Chain');
-      if (stopBtn) stopBtn.style.display = 'none';
-      return;
+  if (chainAppMode === 'auto') {
+    if (!chainApp?.exists) {
+      const label = chain.map(s => STEP_DEFS[s.type]?.label || s.type).join(' → ').slice(0, 60);
+      setLoading(runBtn, true, '<i class="bi bi-shield-plus me-1"></i>Creating app…');
+      try {
+        const r = await fetch('/api/chain-app', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chainId, chainLabel: `Test Chain: ${label}` })
+        });
+        chainApp = await r.json();
+        if (!r.ok) throw new Error(chainApp.error || `HTTP ${r.status}`);
+        toast('Okta test app ready', 'success');
+      } catch (e) {
+        toast(`Could not auto-create Okta app: ${e.message}`, 'error');
+        _chainRunning = false;
+        setLoading(runBtn, false, '<i class="bi bi-play-fill me-1"></i>Run Chain');
+        if (stopBtn) stopBtn.style.display = 'none';
+        return;
+      }
     }
+    // Re-sync every step's creds on every run, not just the first — catches
+    // steps added/loaded since the app was created, and any stale leftover
+    // clientId/clientSecret from global Settings or a previously-saved chain.
+    applyChainAppToSteps();
+    saveChain();
+    renderChainAppBadge();
+    renderPipeline();
   }
 
   setLoading(runBtn, true, '<i class="bi bi-play-fill me-1"></i>Running…');
